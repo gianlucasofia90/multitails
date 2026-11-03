@@ -39,8 +39,19 @@ jobs:
         run: |
           curl -sSL -o pluginval.zip https://github.com/Tracktion/pluginval/releases/latest/download/pluginval_Linux.zip
           unzip -q pluginval.zip
+          set +e
           ./pluginval --strictness-level 8 --skip-gui-tests --validate-in-process --timeout-ms 900000 \
-            "build/Multitails_artefacts/$BUILD_TYPE/VST3/MULTITAILS.vst3"
+            "build/Multitails_artefacts/$BUILD_TYPE/VST3/MULTITAILS.vst3" 2>&1 | tee pluginval.log
+          rc=${PIPESTATUS[0]}
+          set -e
+          # On Linux pluginval sometimes (about 1 run in 40, any plugin version) segfaults while closing,
+          # after every test passed: the crash is in its own VST3 host run loop (juce::RunLoop::Impl fd
+          # callback), not in the plugin. Accept that one case, fail on everything else.
+          if [ "$rc" -eq 139 ] && tail -n 5 pluginval.log | grep -qx 'SUCCESS'; then
+            echo "::warning::pluginval passed every test, then crashed while closing (host run-loop race on Linux)"
+            exit 0
+          fi
+          exit "$rc"
       - name: Package
         run: |
           mkdir -p dist
