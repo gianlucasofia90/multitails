@@ -1,6 +1,6 @@
 # MULTITAILS – note per lo sviluppo
 
-- JUCE 8 audio effect with MIDI input (VST3/AU/AAX, optional VST2). Third of the family after SONIC GRAIN and DR. SEGG-UENCER: same look and toolchain, violet ground.
+- JUCE 8 audio effect with MIDI input (VST3/AU/AAX, optional VST2). Third of the family after SONIC GRAIN and DR. SEGG-UENCER: same look and toolchain, fox-orange ground with a sky-blue slab and two white-tipped tails (`foxTail` in `TailsUI.h`).
 - `Source/TailsCore.h`, `TailsConv.h`, `TailsFx.h`, `TailsSplit.h`, `TailsEngine.h` hold no JUCE and must stay real-time safe: no allocation, no locks after `prepare()`. Control runs on a grid of `kTick` (32) samples counted from `prepare()` and the sequencer reads musical time, so output does not depend on buffer size (tested).
 - Build + tests: `cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DMULTITAILS_BUILD_TESTS=ON -DMULTITAILS_COPY_AFTER_BUILD=OFF && cmake --build build --target MultitailsTests -j2`, then run `build/Tests/MultitailsTests_artefacts/Release/MultitailsTests`. `--snap file.png page stream fx preset scale` renders the editor (page 0 effects, 1 MIDI map); look at it after any UI change. `--render file.wav preset seconds` plays a test phrase through a preset.
 - JUCE: `-DJUCE_DIR=<path>` for a local copy; otherwise FetchContent downloads tag 8.0.10.

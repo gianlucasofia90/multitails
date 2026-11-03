@@ -1,5 +1,8 @@
 # Changelog
 
+## [Non rilasciato]
+- Nuova grafica: fondo arancione volpe con fascia azzurra e scacchiera chiara, due code dalla punta bianca dietro i pannelli e accanto al logo, tag del preset blu. Controlli, misure e disposizione invariati.
+
 ## [0.1.0] - 2026-11-03
 Prima versione.
 - Split transiente/tonale in tempo e frequenza, con Focus, Smoothing, Trans Decay e Source. La somma dei due flussi è esattamente l'ingresso.

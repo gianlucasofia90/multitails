@@ -1,6 +1,7 @@
 #pragma once
 // MULTITAILS UI parts. Same design language as SONIC GRAIN and DR. SEGG-UENCER (glass panels, slanted black plates, dark
-// knobs with a yellow value arc, pixel-font readouts). The ground is violet, the third colour of the family.
+// knobs with a yellow value arc, pixel-font readouts). The ground is fox orange with a sky-blue slab and two white-tipped
+// tails behind the panels: the third colour of the family.
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <juce_audio_formats/juce_audio_formats.h>
 #include <map>
@@ -12,13 +13,16 @@ namespace tails
 {
 namespace c
 {
-    // only the ground layer differs from the two sibling plugins, every other name keeps its value
-    const juce::Colour ground    { 0xff4b23c8 };   // violet, white on it 7.7:1
-    const juce::Colour groundAlt { 0xff2c1180 };   // header strip
-    const juce::Colour slab      { 0xff3b1aa3 };   // diagonal band behind the right side
+    // only the ground layer, its shadows and the preset tag differ from the two sibling plugins
+    const juce::Colour ground    { 0xffef7d0f };   // fox orange
+    const juce::Colour groundAlt { 0xffb24a00 };   // header strip, white on it 5.3:1
+    const juce::Colour slab      { 0xff3aa3ea };   // sky-blue diagonal band behind the right side
+    const juce::Colour fur       { 0xfff7a21e };   // tail body, a shade lighter than the ground
+    const juce::Colour furTip    { 0xfffdfcf8 };   // white tail tip
+    const juce::Colour furLine   { 0xff7a3300 };   // tail outline
     const juce::Colour modGround { 0xff17191d };   // track deck
     const juce::Colour glass     { 0xf5f6f7fa };   // rgba(246, 247, 250, 0.96): almost opaque, no cast from the ground
-    const juce::Colour panelShadow { 0x52120040 };
+    const juce::Colour panelShadow { 0x524a1c00 };
     const juce::Colour glassEdge { 0xe6ffffff };
     const juce::Colour ink       { 0xff0b1430 };
     const juce::Colour inkSoft   { 0xff33415f };
@@ -28,16 +32,14 @@ namespace c
     const juce::Colour onAccent  { 0xff0b1430 };
     const juce::Colour go        { 0xff1f9e1a };
     const juce::Colour signal    { 0xffe90101 };
-    const juce::Colour tag       { 0xff0123c0 };
-    const juce::Colour orbitA    { 0xffffd21f };   // yellow tail
-    const juce::Colour orbitB    { 0xffe8ecf1 };   // chrome tail
-    const juce::Colour knob      { 0xff16212f };
+    const juce::Colour tag       { 0xff0b63c9 };   // eye blue, white on it 5.6:1
+        const juce::Colour knob      { 0xff16212f };
     const juce::Colour knobHi    { 0xff3a4b63 };
     const juce::Colour track     { 0x240b1430 };   // ink at 14 %
     const juce::Colour trackDark { 0x24ffffff };   // white at 14 %, for controls on plates and the deck
     const juce::Colour display   { 0xeb082660 };   // rgba(8, 38, 96, 0.92)
     const juce::Colour wave      { 0xffffffff };
-    const juce::Colour checker   { 0x21000000 };   // black 13 % on the ground
+    const juce::Colour checker   { 0x1fffffff };   // white 12 % on the ground and the slab
     const juce::Colour grid      { 0x2effffff };
 }
 
@@ -100,6 +102,58 @@ inline void hazard (juce::Graphics& g, juce::Rectangle<float> r, float band = 10
         p.addQuadrilateral (x, r.getBottom(), x + band, r.getBottom(), x + band + h, r.getY(), x + h, r.getY());
         g.fillPath (p);
     }
+}
+
+/** One fox tail along an arc around (cx, cy): thin at the root, full in the middle, a white tip with a jagged edge.
+    a0 is the root angle and a1 the tip angle (radians, JUCE convention: 0 at 12 o'clock, clockwise). */
+inline void foxTail (juce::Graphics& g, float cx, float cy, float rad, float a0, float a1, float maxW)
+{
+    const float k = juce::jlimit (0.3f, 1.0f, maxW / 130.0f);   // shadow and outline follow the size
+    auto at = [&] (float t, float off)
+    {
+        const float a = a0 + (a1 - a0) * t, r = rad + off;
+        return juce::Point<float> (cx + r * std::sin (a), cy - r * std::cos (a));
+    };
+    auto width = [&] (float t)
+    {
+        const float b = std::sin (juce::MathConstants<float>::pi * std::pow (t, 0.75f));
+        return maxW * (0.22f + 0.78f * b) * (t > 0.82f ? juce::jmax (0.0f, (1.0f - t) / 0.18f) : 1.0f);
+    };
+    auto side = [&] (float from, float to, int n, juce::Path& p, bool outer, bool start)
+    {
+        for (int i = 0; i <= n; ++i)
+        {
+            const float t = outer ? from + (to - from) * (float) i / (float) n : to - (to - from) * (float) i / (float) n;
+            const auto pt = at (t, (outer ? 0.5f : -0.5f) * width (t));
+            if (start && i == 0) p.startNewSubPath (pt); else p.lineTo (pt);
+        }
+    };
+    juce::Path body;
+    side (0.0f, 1.0f, 60, body, true, true);
+    side (0.0f, 1.0f, 60, body, false, false);
+    body.closeSubPath();
+
+    // tip: from a zigzag across the tail at t ~ 0.68 to the point
+    const float tz = 0.68f;
+    juce::Path tip;
+    side (tz, 1.0f, 30, tip, true, true);
+    side (tz, 1.0f, 30, tip, false, false);
+    for (int k = 0; k <= 6; ++k)
+    {
+        const float u = (float) k / 6.0f;
+        const float t = tz + ((k % 2) ? -0.045f : 0.0f);
+        tip.lineTo (at (t, (u - 0.5f) * width (t)));
+    }
+    tip.closeSubPath();
+
+    g.setColour (juce::Colour (0x33000000));
+    g.fillPath (body, juce::AffineTransform::translation (8.0f * k, 8.0f * k));
+    g.setColour (c::fur);
+    g.fillPath (body);
+    g.setColour (c::furTip);
+    g.fillPath (tip);
+    g.setColour (c::furLine);
+    g.strokePath (body, juce::PathStrokeType (3.0f * k, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
 }
 
 /** Glass panel with its two-line title: kicker word, then the section word on a tagged plate. */

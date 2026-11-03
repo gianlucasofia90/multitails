@@ -135,35 +135,27 @@ public:
     {
         using namespace tails;
         const float W = (float) getWidth(), H = (float) getHeight();
+        // ground: fox orange, a sky-blue slab with a plate edge, a light checkerboard over both, two white-tipped tails
         g.fillAll (c::ground);
         juce::Path band;
         band.addQuadrilateral (700, kHeaderH, W, kHeaderH, W, H, 1020, H);
         g.setColour (c::slab);
         g.fillPath (band);
+        g.setColour (c::checker);
+        for (int y = kHeaderH; y < getHeight(); y += 32)
+            for (int x = (((y - kHeaderH) / 32) % 2) * 32; x < getWidth(); x += 64)
+                g.fillRect (x, y, 32, 32);
         g.setColour (c::plate);
         g.drawLine (700, kHeaderH, 1020, H, 6.0f);
-        g.setColour (c::checker);
-        for (int y = 432; y < getHeight(); y += 32)
-            for (int x = ((y / 32) % 2) * 32; x < getWidth(); x += 64)
-                g.fillRect (x, y, 32, 32);
-        // the family's rings, here as tails that thin out
-        for (int k = 0; k < 3; ++k)
-        {
-            const float rad = 820.0f - (float) k * 120.0f;
-            const auto col = k == 1 ? c::orbitB : c::orbitA;
-            for (int s = 0; s < 40; ++s)
-            {
-                const float a0 = -1.3f + (float) s * 0.05f + (float) k * 0.1f, a1 = a0 + 0.055f;
-                juce::Path p;
-                p.addCentredArc (1240.0f, 1040.0f, rad, rad, 0.0f, -a0 - 0.3f, -a1 - 0.3f, true);
-                g.setColour (col.withAlpha (0.85f * (1.0f - (float) s / 40.0f)));
-                g.strokePath (p, juce::PathStrokeType (10.0f * (1.0f - (float) s / 48.0f)));
-            }
-        }
+        foxTail (g, 1300.0f, 1120.0f, 900.0f, -1.42f, -0.30f, 150.0f);
+        foxTail (g, 1300.0f, 1120.0f, 690.0f, -1.30f, -0.12f, 130.0f);
 
         g.setColour (c::groundAlt);
         g.fillRect (0.0f, 0.0f, W, (float) kHeaderH);
         hazard (g, { 0.0f, (float) kHeaderH - 6.0f, W, 6.0f });
+        // the logo's two tails, behind the last letters
+        foxTail (g, 150.0f, -46.0f, 84.0f, 3.14f, 2.16f, 26.0f);
+        foxTail (g, 158.0f, -90.0f, 128.0f, 3.14f, 2.42f, 23.0f);
         g.setFont (black (34.0f, -0.01f));
         const juce::String name ("MULTITAILS");
         g.setColour (c::go);      g.drawText (name, 22, 15, 340, 40, juce::Justification::centredLeft);
