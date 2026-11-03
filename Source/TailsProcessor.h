@@ -6,7 +6,7 @@
 #include "Presets.h"
 #include <map>
 
-class TailsProcessor : public juce::AudioProcessor, private juce::Timer
+class TailsProcessor : public juce::AudioProcessor
 {
 public:
     TailsProcessor();
@@ -89,7 +89,7 @@ private:
         bool operator== (const Wanted& o) const { return ir == o.ir && std::abs (size - o.size) < 0.001f && reversed == o.reversed && path == o.path && rate == o.rate; }
     };
 
-    void timerCallback() override;
+    void queueMidiFlush();
     void pullParams() noexcept;
     void runBlock (juce::AudioBuffer<float>&, juce::MidiBuffer&, bool bypassed);
     void render (float* l, float* r, int n, const tails::Transport&) noexcept;
@@ -111,6 +111,8 @@ private:
     std::vector<juce::RangedAudioParameter*> ranged;
     std::vector<std::atomic<float>*> rawValue;
     std::unique_ptr<std::atomic<float>[]> midiPending;
+    std::atomic<bool> flushQueued { false };
+    std::shared_ptr<std::atomic<bool>> alive = std::make_shared<std::atomic<bool>> (true);
     std::map<juce::String, int> paramIndex;
 
     // impulse responses

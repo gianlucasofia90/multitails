@@ -11,7 +11,7 @@
 - Decay and Damp act per partition inside the convolver at run time, so lanes can reach them. Size, Reverse and the IR choice rebuild the response on the worker thread and are not sequencer destinations.
 - Decay is a gain per 1024-sample partition, so on very short tails the envelope has steps of 21 ms. Accepted: a smooth version would cost a second convolution.
 - The audio thread never touches an IR build. `TailsProcessor::Worker` polls the parameters, builds, posts; the convolver swaps at a partition boundary with a crossfade and parks the old response for the worker to delete.
-- MIDI map: the audio thread writes the mapped value straight into the parameter's raw atomic, so the engine hears it at once; the host parameter follows on the message thread (`flushMidiMap`).
+- MIDI map: the audio thread writes the mapped value straight into the parameter's raw atomic, so the engine hears it at once; the host parameter follows on the message thread (`flushMidiMap`, queued by the worker thread). The processor has no `juce::Timer`, so an idle plugin posts nothing to the message thread.
 - Step data and the MIDI map are not host parameters: they are child nodes of the state. The MIDI map is saved with the session but not in presets, because it belongs to the machine.
 - Factory IRs: `tools/make_irs.py`, see `Resources/ir/README.md`. The 8 rooms are CC BY-SA 4.0: keep the attribution.
 - Release: update `CHANGELOG.md` and `project(... VERSION x.y.z)` in `CMakeLists.txt`, then push tag `vx.y.z`. CI builds and publishes the Release.

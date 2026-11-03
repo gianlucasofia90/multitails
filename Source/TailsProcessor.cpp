@@ -74,6 +74,7 @@ public:
         while (! threadShouldExit())
         {
             wait (25);
+            proc.queueMidiFlush();
             if (! proc.prepared) continue;
             for (int s = 0; s < kStreams && ! threadShouldExit(); ++s)
             {
@@ -122,12 +123,11 @@ TailsProcessor::TailsProcessor()
     pullParams();
     worker = std::make_unique<Worker> (*this);
     worker->startThread (juce::Thread::Priority::background);
-    startTimerHz (30);
 }
 
 TailsProcessor::~TailsProcessor()
 {
-    stopTimer();
+    alive->store (false);
     worker->signalThreadShouldExit();
     worker->notify();
     worker->stopThread (4000);
@@ -211,7 +211,19 @@ void TailsProcessor::flushMidiMap()
     }
 }
 
-void TailsProcessor::timerCallback() { flushMidiMap(); }
+/** Worker thread. No timer here: a plugin with no MIDI mapped posts nothing to the message thread. */
+void TailsProcessor::queueMidiFlush()
+{
+    bool any = false;
+    for (size_t i = 0; i < ranged.size() && ! any; ++i)
+        any = midiPending[i].load (std::memory_order_relaxed) >= 0.0f;
+    if (! any || flushQueued.exchange (true)) return;
+    juce::MessageManager::callAsync ([this, token = alive] {
+        if (! token->load()) return;
+        flushQueued = false;
+        flushMidiMap();
+    });
+}
 
 juce::String TailsProcessor::paramName (int i) const { return juce::isPositiveAndBelow (i, (int) ranged.size()) && ranged[(size_t) i] != nullptr ? ranged[(size_t) i]->getName (64) : juce::String(); }
 juce::String TailsProcessor::paramId (int i) const   { return juce::isPositiveAndBelow (i, (int) ranged.size()) && ranged[(size_t) i] != nullptr ? ranged[(size_t) i]->paramID : juce::String(); }

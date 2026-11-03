@@ -56,7 +56,7 @@ public:
         midiBtn.onClick = [this] { showMidi (midiBtn.getToggleState()); };
         resetBtn.setButtonText ("RESET"); clrBtn.setButtonText ("CLR"); rndBtn.setButtonText ("RND"); loadBtn.setButtonText ("LOAD IR");
         for (auto* b : { &resetBtn, &clrBtn, &rndBtn }) b->getProperties().set ("sgDeck", true);
-        resetBtn.onClick = [this] { proc.setParam ("g_reset", 1); juce::Timer::callAfterDelay (60, [safe = juce::Component::SafePointer<TailsView> (this)] { if (safe != nullptr) safe->proc.setParam ("g_reset", 0); }); };
+        resetBtn.onClick = [this] { proc.setParam ("g_reset", 1); resetHold = 3; };   // released by the timer, after the audio thread has seen it
         clrBtn.onClick = [this] { for (auto& s : proc.engine->patterns[(size_t) lane].step) s.store (0.0f); };
         rndBtn.onClick = [this] {
             auto& r = juce::Random::getSystemRandom();
@@ -434,6 +434,7 @@ private:
     void timerCallback() override
     {
         using namespace tails;
+        if (resetHold > 0 && --resetHold == 0) proc.setParam ("g_reset", 0);
         chains.tick(); wave.repaint(); lanesView.tick(); steps.tick();
         inMeter.tick(); outMeter.tick();
         if (well.isVisible()) well.tick();
@@ -493,7 +494,7 @@ private:
     juce::TextButton prevBtn, nextBtn, saveBtn, delBtn, midiBtn, resetBtn, clrBtn, rndBtn, loadBtn;
     juce::ComboBox presetBox;
     std::unique_ptr<juce::FileChooser> chooser;
-    int stream = 0, fx = 0, lane = 0, slowTick = 0;
+    int stream = 0, fx = 0, lane = 0, slowTick = 0, resetHold = 0;
     bool freeShown = false;
     float bpmShown = 0.0f;
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (TailsView)
