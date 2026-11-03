@@ -2,6 +2,8 @@
 // Partitioned convolution without JUCE. Two tiers of uniform partitions: 64 samples for the head of the IR, 1024 for the
 // rest. The wet signal sits 64 samples behind the input (1.3 ms at 48 kHz) and no latency is reported for it.
 // Decay and Damp act per partition at run time, so they can be sequenced without rebuilding anything.
+// Tier B is spread over the 16 ticks of tier A in each block, with no threads: a long IR must not cost one big spike every
+// 1024 samples. That needs one spare block, so tier A runs 1024 samples further than tier B strictly requires ("bridge").
 #include <algorithm>
 #include <array>
 #include <atomic>
@@ -123,8 +125,10 @@ private:
     std::vector<float> tr, ti;
 };
 
-constexpr int kBlockA = 64, kBlockB = 1024, kPartsA = 15;
-constexpr int kHeadSamples = kBlockA * kPartsA;          // 960: tier B takes over here (see Convolver::boundary)
+constexpr int kBlockA = 64, kBlockB = 1024, kPartsHead = 15, kPartsBridge = kBlockB / kBlockA, kPartsA = kPartsHead + kPartsBridge;
+constexpr int kHeadSamples = kBlockA * kPartsHead;       // 960: Decay and Damp start here
+constexpr int kTailStart = kBlockA * kPartsA;            // 1984: tier B takes over here (see Convolver::startFrame)
+constexpr int kStepsB = kBlockB / kBlockA, kAddStepsB = kStepsB - 2;   // ticks per block, of which two finish a channel each
 constexpr int kBinsA = kBlockA + 1, kBinsB = kBlockB + 1;
 constexpr double kMaxIrSeconds = 20.0;
 constexpr int kPreviewPoints = 128;
@@ -209,7 +213,7 @@ inline IrData* buildIr (std::vector<float> l, std::vector<float> r, double sr, b
         if (top > 0.0f) for (auto& v : d->preview) v /= top;
     }
 
-    const int tailLen = (int) len - kHeadSamples;
+    const int tailLen = (int) len - kTailStart;
     d->partsB = tailLen > 0 ? (tailLen + kBlockB - 1) / kBlockB : 0;
     RealFFT fa (kBlockA * 2), fb (kBlockB * 2);
     std::vector<float> time ((size_t) kBlockB * 2);
@@ -235,7 +239,7 @@ inline IrData* buildIr (std::vector<float> l, std::vector<float> r, double sr, b
             std::fill (time.begin(), time.end(), 0.0f);
             for (int i = 0; i < kBlockB; ++i)
             {
-                const size_t k = (size_t) kHeadSamples + (size_t) p * kBlockB + (size_t) i;
+                const size_t k = (size_t) kTailStart + (size_t) p * kBlockB + (size_t) i;
                 if (k < len) time[(size_t) i] = x[k];
             }
             fb.forward (time.data(), d->bRe[(size_t) ch].data() + (size_t) p * kBinsB, d->bIm[(size_t) ch].data() + (size_t) p * kBinsB);
@@ -272,6 +276,7 @@ public:
             const double f = k * sr / (2.0 * kBlockB);
             damp[(size_t) k] = (float) (1.0 / (1.0 + (f / fc) * (f / fc)));
         }
+        for (int k = 0; k < kBinsA; ++k) dampA[(size_t) k] = damp[(size_t) (k * (kBlockB / kBlockA))];
         reset();
     }
 
@@ -280,18 +285,19 @@ public:
         for (auto& c : chans)
         {
             std::fill (c.inA.begin(), c.inA.end(), 0.0f); std::fill (c.inB.begin(), c.inB.end(), 0.0f);
-            std::fill (c.outA.begin(), c.outA.end(), 0.0f); std::fill (c.outB.begin(), c.outB.end(), 0.0f);
+            std::fill (c.outA.begin(), c.outA.end(), 0.0f);
+            for (auto& o : c.outB) std::fill (o.begin(), o.end(), 0.0f);
             std::fill (c.fdlAre.begin(), c.fdlAre.end(), 0.0f); std::fill (c.fdlAim.begin(), c.fdlAim.end(), 0.0f);
             std::fill (c.fdlBre.begin(), c.fdlBre.end(), 0.0f); std::fill (c.fdlBim.begin(), c.fdlBim.end(), 0.0f);
         }
-        posA = posB = 0; headA = headB = 0;
+        posA = posB = 0; headA = headB = 0; playB = 0; stepB = kStepsB; shapesStale = true;
     }
 
     /** From any one non-audio thread at a time. The convolver takes ownership. */
     void post (IrData* d) noexcept { delete pending.exchange (d, std::memory_order_acq_rel); }
 
     /** Installs straight away, with no crossfade. Only while the audio thread is not running. */
-    void installNow (IrData* d) noexcept { delete cur; cur = d; delete next; next = nullptr; delete pending.exchange (nullptr, std::memory_order_acq_rel); }
+    void installNow (IrData* d) noexcept { delete cur; cur = d; delete next; next = nullptr; delete pending.exchange (nullptr, std::memory_order_acq_rel); shapesStale = true; }
 
     /** Old responses wait here for a non-audio thread to delete them. */
     void collectGarbage() noexcept { for (auto& s : retired) delete s.exchange (nullptr, std::memory_order_acq_rel); }
@@ -303,35 +309,67 @@ public:
     void process (float* l, float* r, int n, float decay, float dampAmount) noexcept
     {
         decayNow = decay; dampNow = dampAmount;
+        if (shapesStale) refreshShapes();
         auto& a = chans[0]; auto& b = chans[1];
         for (int i = 0; i < n; ++i)
         {
             a.inA[(size_t) (kBlockA + posA)] = l[i];  b.inA[(size_t) (kBlockA + posA)] = r[i];
             a.inB[(size_t) (kBlockB + posB)] = l[i];  b.inB[(size_t) (kBlockB + posB)] = r[i];
-            l[i] = a.outA[(size_t) posA] + a.outB[(size_t) posB];
-            r[i] = b.outA[(size_t) posA] + b.outB[(size_t) posB];
+            l[i] = a.outA[(size_t) posA] + a.outB[(size_t) playB][(size_t) posB];
+            r[i] = b.outA[(size_t) posA] + b.outB[(size_t) playB][(size_t) posB];
             ++posB;
             if (++posA == kBlockA)
             {
                 posA = 0;
                 if (posB == kBlockB) { posB = 0; boundary(); }
                 runA();
+                runStepB();
             }
         }
     }
 
 private:
+    struct Sum { std::array<float, kBinsB> yr {}, yi {}, y2r {}, y2i {}; };
+
+    /** What Decay and Damp mean for one IR during one block. g and gh are at kHeadSamples, one step per 1024 samples. */
+    struct Shape { float g = 1.0f, gh = 1.0f, stepG = 1.0f, stepH = 1.0f; bool useDamp = false; };
+    struct Cursor { float g = 1.0f, gh = 1.0f; };
+
     struct Chan
     {
         std::array<float, kBlockA * 2> inA {}, outA {}, timeA {};
-        std::array<float, kBlockB * 2> inB {}, outB {}, timeB {};
-        std::array<float, kBinsB> yr {}, yi {}, y2r {}, y2i {};
+        std::array<float, kBinsA> ar {}, ai {}, br {}, bi {}, b2r {}, b2i {};      // head, bridge, darker bridge
+        std::array<float, kBlockB * 2> inB {}, timeB {};
+        std::array<std::array<float, kBlockB>, 2> outB {};                        // one plays while the other is built
+        std::array<Sum, 2> sum {};                                                // current IR, incoming IR
         std::array<float, kBlockB> incomingB {};
         std::vector<float> fdlAre, fdlAim, fdlBre, fdlBim;
     };
 
+    Shape shapeOf (const IrData& d) const noexcept
+    {
+        Shape s;
+        s.useDamp = d.shapable && dampNow > 0.001f;
+        const double step = kBlockB / sr;
+        const double t60 = std::max (0.05, (double) d.t60);
+        const double extra = d.shapable ? 6.9078 / t60 * (1.0 / std::max (0.05, (double) decayNow) - 1.0) : 0.0;
+        const double hiLoss = s.useDamp ? 3.0 * (double) dampNow * 6.9078 / std::max (0.05, t60 * decayNow) : 0.0;
+        const double t = (double) kHeadSamples / sr;
+        s.g = (float) std::exp (-extra * t); s.gh = (float) std::exp (-(extra + hiLoss) * t);
+        s.stepG = (float) std::exp (-extra * step); s.stepH = (float) std::exp (-(extra + hiLoss) * step);
+        return s;
+    }
+
+    void refreshShapes() noexcept
+    {
+        if (cur != nullptr) shapes[0] = shapeOf (*cur);
+        if (next != nullptr) shapes[1] = shapeOf (*next);
+        shapesStale = false;
+    }
+
     void boundary() noexcept
     {
+        playB ^= 1;   // the block built during the last 1024 samples starts playing
         if (next != nullptr)
         {   // the crossfade of the last 1024 samples is over
             bool parked = false;
@@ -348,7 +386,8 @@ private:
             for (auto& s : retired) if (s.load (std::memory_order_acquire) == nullptr) room = true;
             if (room) next = pending.exchange (nullptr, std::memory_order_acq_rel);
         }
-        runB();
+        refreshShapes();
+        startFrame();
     }
 
     static void accumulate (float* yr, float* yi, const float* xr, const float* xi, const float* hr, const float* hi, int bins, float g) noexcept
@@ -360,17 +399,37 @@ private:
         }
     }
 
-    void convolveA (Chan& c, size_t ch, const IrData& d, float* out) noexcept
+    void convolveA (Chan& c, size_t ch, const IrData& d, const Shape& shape, float* out) noexcept
     {
-        std::fill (c.yr.begin(), c.yr.begin() + kBinsA, 0.0f);
-        std::fill (c.yi.begin(), c.yi.begin() + kBinsA, 0.0f);
-        for (int p = 0; p < kPartsA; ++p)
+        std::fill (c.ar.begin(), c.ar.end(), 0.0f);
+        std::fill (c.ai.begin(), c.ai.end(), 0.0f);
+        auto add = [&] (float* yr, float* yi, int p, float g)
         {
             const int slot = (headA - p + kPartsA) % kPartsA;
-            accumulate (c.yr.data(), c.yi.data(), c.fdlAre.data() + slot * kBinsA, c.fdlAim.data() + slot * kBinsA,
-                        d.aRe[ch].data() + p * kBinsA, d.aIm[ch].data() + p * kBinsA, kBinsA, 1.0f);
+            accumulate (yr, yi, c.fdlAre.data() + slot * kBinsA, c.fdlAim.data() + slot * kBinsA,
+                        d.aRe[ch].data() + p * kBinsA, d.aIm[ch].data() + p * kBinsA, kBinsA, g);
+        };
+        for (int p = 0; p < kPartsHead; ++p) add (c.ar.data(), c.ai.data(), p, 1.0f);
+        // the bridge takes the Decay and Damp of the 1024 samples it covers, as one partition of tier B would
+        if (shape.useDamp)
+        {
+            std::fill (c.br.begin(), c.br.end(), 0.0f);  std::fill (c.bi.begin(), c.bi.end(), 0.0f);
+            std::fill (c.b2r.begin(), c.b2r.end(), 0.0f); std::fill (c.b2i.begin(), c.b2i.end(), 0.0f);
+            for (int p = kPartsHead; p < kPartsA; ++p)
+            {
+                add (c.br.data(), c.bi.data(), p, shape.g);
+                add (c.b2r.data(), c.b2i.data(), p, shape.gh);
+            }
+            for (int k = 0; k < kBinsA; ++k)
+            {
+                const float m = dampA[(size_t) k];
+                c.ar[(size_t) k] += m * c.br[(size_t) k] + (1.0f - m) * c.b2r[(size_t) k];
+                c.ai[(size_t) k] += m * c.bi[(size_t) k] + (1.0f - m) * c.b2i[(size_t) k];
+            }
         }
-        fa.inverse (c.yr.data(), c.yi.data(), c.timeA.data());
+        else
+            for (int p = kPartsHead; p < kPartsA; ++p) add (c.ar.data(), c.ai.data(), p, shape.g);
+        fa.inverse (c.ar.data(), c.ai.data(), c.timeA.data());
         std::memcpy (out, c.timeA.data() + kBlockA, sizeof (float) * kBlockA);
     }
 
@@ -382,12 +441,12 @@ private:
             auto& c = chans[ch];
             fa.forward (c.inA.data(), c.fdlAre.data() + headA * kBinsA, c.fdlAim.data() + headA * kBinsA);
             std::memcpy (c.inA.data(), c.inA.data() + kBlockA, sizeof (float) * kBlockA);
-            if (cur != nullptr) convolveA (c, ch, *cur, c.outA.data());
+            if (cur != nullptr) convolveA (c, ch, *cur, shapes[0], c.outA.data());
             else std::fill (c.outA.begin(), c.outA.begin() + kBlockA, 0.0f);
             if (next != nullptr)
             {
                 std::array<float, kBlockA> incoming;
-                convolveA (c, ch, *next, incoming.data());
+                convolveA (c, ch, *next, shapes[1], incoming.data());
                 for (int i = 0; i < kBlockA; ++i)
                 {
                     const float x = (float) (posB + i) / (float) kBlockB;
@@ -397,44 +456,8 @@ private:
         }
     }
 
-    void convolveB (Chan& c, size_t ch, const IrData& d, float* out) noexcept
-    {
-        std::fill (c.yr.begin(), c.yr.end(), 0.0f);
-        std::fill (c.yi.begin(), c.yi.end(), 0.0f);
-        const bool useDamp = d.shapable && dampNow > 0.001f;
-        if (useDamp) { std::fill (c.y2r.begin(), c.y2r.end(), 0.0f); std::fill (c.y2i.begin(), c.y2i.end(), 0.0f); }
-
-        const double step = kBlockB / sr;
-        const double t60 = std::max (0.05, (double) d.t60);
-        const double extra = d.shapable ? 6.9078 / t60 * (1.0 / std::max (0.05, (double) decayNow) - 1.0) : 0.0;
-        const double hiLoss = useDamp ? 3.0 * (double) dampNow * 6.9078 / std::max (0.05, t60 * decayNow) : 0.0;
-        double t = (double) kHeadSamples / sr;
-        float g = (float) std::exp (-extra * t), gh = (float) std::exp (-(extra + hiLoss) * t);
-        const float stepG = (float) std::exp (-extra * step), stepH = (float) std::exp (-(extra + hiLoss) * step);
-
-        const int parts = std::min (d.partsB, capB);
-        for (int p = 0; p < parts; ++p)
-        {
-            if (g < 1.0e-5f) break;      // inaudible, and most of the cost of a short Decay goes away
-            const size_t slot = (size_t) ((headB - p + capB) % capB) * kBinsB;
-            const float* xr = c.fdlBre.data() + slot;  const float* xi = c.fdlBim.data() + slot;
-            const float* hr = d.bRe[ch].data() + (size_t) p * kBinsB;  const float* hi = d.bIm[ch].data() + (size_t) p * kBinsB;
-            accumulate (c.yr.data(), c.yi.data(), xr, xi, hr, hi, kBinsB, g);
-            if (useDamp) accumulate (c.y2r.data(), c.y2i.data(), xr, xi, hr, hi, kBinsB, gh);
-            g *= stepG; gh *= stepH;
-        }
-        if (useDamp)
-            for (int k = 0; k < kBinsB; ++k)
-            {
-                const float m = damp[(size_t) k];
-                c.yr[(size_t) k] = m * c.yr[(size_t) k] + (1.0f - m) * c.y2r[(size_t) k];
-                c.yi[(size_t) k] = m * c.yi[(size_t) k] + (1.0f - m) * c.y2i[(size_t) k];
-            }
-        fb.inverse (c.yr.data(), c.yi.data(), c.timeB.data());
-        std::memcpy (out, c.timeB.data() + kBlockB, sizeof (float) * kBlockB);
-    }
-
-    void runB() noexcept
+    /** At a block boundary: takes in the block just heard. Its tail is built over the next 16 ticks and plays after them. */
+    void startFrame() noexcept
     {
         headB = (headB + 1) % capB;
         for (size_t ch = 0; ch < 2; ++ch)
@@ -442,26 +465,96 @@ private:
             auto& c = chans[ch];
             fb.forward (c.inB.data(), c.fdlBre.data() + (size_t) headB * kBinsB, c.fdlBim.data() + (size_t) headB * kBinsB);
             std::memcpy (c.inB.data(), c.inB.data() + kBlockB, sizeof (float) * kBlockB);
-            if (cur != nullptr) convolveB (c, ch, *cur, c.outB.data());
-            else std::fill (c.outB.begin(), c.outB.begin() + kBlockB, 0.0f);
-            if (next != nullptr)
+        }
+        for (size_t which = 0; which < 2; ++which)
+            cursors[which] = { shapes[which].g * shapes[which].stepG, shapes[which].gh * shapes[which].stepH };   // tier B starts one block later
+        stepB = 0;
+    }
+
+    /** Adds partitions [from, to) of one IR to both channels. */
+    void addPartitions (size_t which, const IrData& d, int from, int to) noexcept
+    {
+        const auto& shape = shapes[which];
+        auto& at = cursors[which];
+        for (int p = from; p < to; ++p)
+        {
+            if (at.g < 1.0e-5f) return;      // inaudible, and most of the cost of a short Decay goes away
+            const size_t slot = (size_t) ((headB - p + capB) % capB) * kBinsB;
+            for (size_t ch = 0; ch < 2; ++ch)
             {
-                convolveB (c, ch, *next, c.incomingB.data());
-                for (int i = 0; i < kBlockB; ++i)
-                {
-                    const float x = (float) i / (float) kBlockB;
-                    c.outB[(size_t) i] += x * (c.incomingB[(size_t) i] - c.outB[(size_t) i]);
-                }
+                auto& c = chans[ch];
+                auto& y = c.sum[which];
+                const float* xr = c.fdlBre.data() + slot;  const float* xi = c.fdlBim.data() + slot;
+                const float* hr = d.bRe[ch].data() + (size_t) p * kBinsB;  const float* hi = d.bIm[ch].data() + (size_t) p * kBinsB;
+                accumulate (y.yr.data(), y.yi.data(), xr, xi, hr, hi, kBinsB, at.g);
+                if (shape.useDamp) accumulate (y.y2r.data(), y.y2i.data(), xr, xi, hr, hi, kBinsB, at.gh);
+            }
+            at.g *= shape.stepG; at.gh *= shape.stepH;
+        }
+    }
+
+    /** Turns one sum into samples and clears it for the next block. */
+    void finishSum (Chan& c, size_t which, float* out) noexcept
+    {
+        auto& y = c.sum[which];
+        if (shapes[which].useDamp)
+            for (int k = 0; k < kBinsB; ++k)
+            {
+                const float m = damp[(size_t) k];
+                y.yr[(size_t) k] = m * y.yr[(size_t) k] + (1.0f - m) * y.y2r[(size_t) k];
+                y.yi[(size_t) k] = m * y.yi[(size_t) k] + (1.0f - m) * y.y2i[(size_t) k];
+            }
+        fb.inverse (y.yr.data(), y.yi.data(), c.timeB.data());
+        std::memcpy (out, c.timeB.data() + kBlockB, sizeof (float) * kBlockB);
+        std::fill (y.yr.begin(), y.yr.end(), 0.0f);   std::fill (y.yi.begin(), y.yi.end(), 0.0f);
+        std::fill (y.y2r.begin(), y.y2r.end(), 0.0f); std::fill (y.y2i.begin(), y.y2i.end(), 0.0f);
+    }
+
+    void finishChannel (size_t ch) noexcept
+    {
+        auto& c = chans[ch];
+        auto& out = c.outB[(size_t) (playB ^ 1)];
+        if (cur != nullptr) finishSum (c, 0, out.data());
+        else std::fill (out.begin(), out.end(), 0.0f);
+        if (next != nullptr)
+        {
+            finishSum (c, 1, c.incomingB.data());
+            for (int i = 0; i < kBlockB; ++i)
+            {
+                const float x = (float) i / (float) kBlockB;
+                out[(size_t) i] += x * (c.incomingB[(size_t) i] - out[(size_t) i]);
             }
         }
     }
 
+    /** One tick of the block being built. Always done by the next boundary: there are as many ticks as steps. */
+    void runStepB() noexcept
+    {
+        if (stepB >= kStepsB) return;
+        if (stepB < kAddStepsB)
+        {
+            auto slice = [this] (size_t which, const IrData& d)
+            {
+                const int parts = std::min (d.partsB, capB);
+                addPartitions (which, d, parts * stepB / kAddStepsB, parts * (stepB + 1) / kAddStepsB);
+            };
+            if (cur != nullptr) slice (0, *cur);
+            if (next != nullptr) slice (1, *next);
+        }
+        else finishChannel ((size_t) (stepB - kAddStepsB));
+        ++stepB;
+    }
+
     double sr = 48000.0;
-    int capB = 1, posA = 0, posB = 0, headA = 0, headB = 0;
+    int capB = 1, posA = 0, posB = 0, headA = 0, headB = 0, playB = 0, stepB = kStepsB;
     float decayNow = 1.0f, dampNow = 0.0f;
+    bool shapesStale = true;
+    std::array<Shape, 2> shapes {};
+    std::array<Cursor, 2> cursors {};
     RealFFT fa, fb;
     std::array<Chan, 2> chans;
     std::vector<float> damp;
+    std::array<float, kBinsA> dampA {};
     IrData* cur = nullptr;
     IrData* next = nullptr;
     std::atomic<IrData*> pending { nullptr };

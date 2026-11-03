@@ -2,6 +2,8 @@
 
 ## [0.1.2] - 2026-11-03
 - Interfaccia molto più fluida: lo sfondo e i controlli fermi vengono conservati in immagine invece di essere ridisegnati a ogni fotogramma. Nelle misure il tempo di disegno scende da 100-180 ms a meno di 10 ms per fotogramma.
+- Convoluzione senza picchi di CPU: la coda dell'IR viene calcolata a piccole dosi invece che tutta insieme ogni 1024 campioni. Con due IR da 9,4 s e buffer da 128 campioni il blocco tipico più lento (99° percentile) scende di circa cinque volte; il carico medio cresce di circa il 10 %.
+- Decay e Damp mandati dal sequencer raggiungono la coda circa 21 ms più tardi. Con i valori fermi il suono non cambia, salvo differenze sotto -45 dB con Damp attivo.
 
 ## [0.1.1] - 2026-11-03
 - macOS: nuovo installer `.pkg` con VST3 e AU. Basta approvare il pacchetto una volta, e i plugin installati non restano bloccati da Gatekeeper.

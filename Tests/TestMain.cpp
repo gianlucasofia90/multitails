@@ -198,6 +198,51 @@ static void testSplitSeparates()
 
 // ---------------------------------------------------------------- effects
 
+/** The convolver on its own: its impulse response must be the IR, 64 samples late, across the head, the bridge and tier B. */
+static void testConvolverAlignment()
+{
+    constexpr int len = 12000;
+    std::mt19937 g (11); std::normal_distribution<float> d;
+    std::vector<float> irl ((size_t) len), irr ((size_t) len);
+    for (int i = 0; i < len; ++i)
+    {
+        const float env = std::exp (-(float) i / 5000.0f);
+        irl[(size_t) i] = env * d (g); irr[(size_t) i] = env * d (g);
+    }
+    auto response = [&] (float decay, float damp, int block, int at) {
+        auto conv = std::make_unique<Convolver>();
+        conv->prepare (48000.0);
+        conv->installNow (buildIr (irl, irr, 48000.0, false));
+        Stereo out = impulse (len + 4096, at);
+        for (int i = 0; i < (int) out.l.size(); i += block)
+            conv->process (out.l.data() + i, out.r.data() + i, juce::jmin (block, (int) out.l.size() - i), decay, damp);
+        return out;
+    };
+    for (int block : { 32, 128, 480 })
+        for (int at : { 0, 700, 1023, 1500 })
+        {
+            const auto o = response (1.0f, 0.0f, block, at);
+            double worst = 0.0;
+            for (int i = 0; i < len; ++i)
+                worst = juce::jmax (worst, (double) std::abs (o.l[(size_t) (at + kBlockA + i)] - irl[(size_t) i]), (double) std::abs (o.r[(size_t) (at + kBlockA + i)] - irr[(size_t) i]));
+            CHECKV (db (worst) < -90.0, "convolver: the output is the IR, 64 samples late, wherever the input falls", db (worst));
+        }
+    // Decay: the bridge plays like the first partition of tier B, and the next partition one step lower
+    {
+        const auto plain = response (1.0f, 0.0f, 64, 0), low = response (0.5f, 0.0f, 64, 0);
+        auto ratio = [&] (int from, int to) {
+            double a = 0.0, b = 0.0;
+            for (int i = from; i < to; ++i) { a += (double) plain.l[(size_t) (kBlockA + i)] * plain.l[(size_t) (kBlockA + i)]; b += (double) low.l[(size_t) (kBlockA + i)] * low.l[(size_t) (kBlockA + i)]; }
+            return std::sqrt (b / a);
+        };
+        const double t60 = estimateT60 (irl, irr, 48000.0);
+        const double extra = 6.9078 / t60;
+        CHECKV (std::abs (ratio (0, kHeadSamples) - 1.0) < 1.0e-3, "Decay leaves the first 960 samples alone", ratio (0, kHeadSamples));
+        CHECKV (std::abs (ratio (kHeadSamples, kTailStart) / std::exp (-extra * kHeadSamples / 48000.0) - 1.0) < 1.0e-3, "Decay on the bridge", ratio (kHeadSamples, kTailStart));
+        CHECKV (std::abs (ratio (kTailStart, kTailStart + kBlockB) / std::exp (-extra * kTailStart / 48000.0) - 1.0) < 1.0e-3, "Decay on tier B", ratio (kTailStart, kTailStart + kBlockB));
+    }
+}
+
 static void testConvolution()
 {
     Rig r;
@@ -1049,10 +1094,19 @@ static void reportCost()
     r.set (TailsProcessor::lid (0, lOn), 1); r.set (TailsProcessor::lid (0, lDest), (float) destOf (fLpF));
     r.syncIr();
     auto in = noise (480000);
-    const auto t0 = std::chrono::steady_clock::now();
-    r.run (in);
-    const double sec = std::chrono::duration<double> (std::chrono::steady_clock::now() - t0).count();
-    std::printf ("CPU: all 12 effects with the 9.4 s IR on both chains: %.1f %% of one core at 48 kHz\n", sec / 10.0 * 100.0);
+    juce::AudioBuffer<float> b (2, 128);
+    juce::MidiBuffer midi;
+    double sec = 0.0, peak = 0.0;
+    for (int i = 0; i + 128 <= 480000; i += 128)
+    {
+        b.copyFrom (0, 0, in.l.data() + i, 128); b.copyFrom (1, 0, in.r.data() + i, 128);
+        const auto t0 = std::chrono::steady_clock::now();
+        r.p.processBlock (b, midi);
+        const double used = std::chrono::duration<double> (std::chrono::steady_clock::now() - t0).count();
+        sec += used;
+        if (i >= 9600) peak = juce::jmax (peak, used);   // the first blocks only warm the caches
+    }
+    std::printf ("CPU: all 12 effects with the 9.4 s IR on both chains: %.1f %% of one core at 48 kHz, slowest block %.2f ms of 2.67\n", sec / 10.0 * 100.0, peak * 1000.0);
 }
 
 // ---------------------------------------------------------------- interface, driven by hand
@@ -1201,7 +1255,7 @@ int main (int argc, char** argv)
     }
     using Fn = void (*)();
     const std::vector<std::pair<const char*, Fn>> tests = {
-        { "null", testNull }, { "split", testSplitSeparates }, { "convolution", testConvolution }, { "user ir", testUserIr },
+        { "null", testNull }, { "split", testSplitSeparates }, { "convolution", testConvolution }, { "convolver", testConvolverAlignment }, { "user ir", testUserIr },
         { "tape", testTape }, { "delay", testDelay }, { "chorus", testChorus }, { "rotary", testRotary }, { "filters", testFilters },
         { "chain", testChainOrder }, { "sequencer", testSequencer }, { "midi map", testMidiMap }, { "state", testState },
         { "presets", testPresets }, { "robustness", testRobust }, { "interface", testInterface }, { "real time", testRealtime } };
