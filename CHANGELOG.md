@@ -1,7 +1,8 @@
 # Changelog
 
 ## [Non rilasciato]
-- Nuova grafica: fondo arancione volpe con fascia azzurra e scacchiera chiara, due code dalla punta bianca dietro i pannelli e accanto al logo, tag del preset blu. Controlli, misure e disposizione invariati.
+- Nuova grafica: fondo arancione volpe con fascia azzurra e scacchiera chiara, due code dalla punta bianca dietro i pannelli, tag del preset blu. Al posto delle strisce gialle e nere, una banda sfumata dall'arancione al bianco della punta della coda.
+- Catene come schema di routing: griglia scura con un filo per flusso e i blocchi infilati in ordine, blocchi spenti tratteggiati, e accanto al nome del flusso una striscia compatta con l'ordine (C T D H R F). Clic, punto di accensione e trascinamento funzionano come prima.
 
 ## [0.1.0] - 2026-11-03
 Prima versione.

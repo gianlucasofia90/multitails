@@ -20,6 +20,12 @@ namespace c
     const juce::Colour fur       { 0xfff7a21e };   // tail body, a shade lighter than the ground
     const juce::Colour furTip    { 0xfffdfcf8 };   // white tail tip
     const juce::Colour furLine   { 0xff7a3300 };   // tail outline
+    const juce::Colour furDeep   { 0xffd2560a };   // fur band, left end
+    const juce::Colour furGold   { 0xffffc861 };   // fur band, towards the tip
+    // the routing canvas of the chain panel
+    const juce::Colour node      { 0xff2a64a8 };   // effect block, on: eye blue, white on it 6.0:1
+    const juce::Colour nodeHi    { 0xff3b7cc4 };
+    const juce::Colour wire      { 0xff5f95cf };
     const juce::Colour modGround { 0xff17191d };   // track deck
     const juce::Colour glass     { 0xf5f6f7fa };   // rgba(246, 247, 250, 0.96): almost opaque, no cast from the ground
     const juce::Colour panelShadow { 0x524a1c00 };
@@ -87,21 +93,17 @@ inline void taggedPlate (juce::Graphics& g, juce::Rectangle<float> r, juce::Colo
     g.setColour (fill);      g.fillPath (platePath (r));
 }
 
-/** Hazard stripes (accent on plate, 45 degrees): the edge of the header and of the track deck. */
-inline void hazard (juce::Graphics& g, juce::Rectangle<float> r, float band = 10.0f)
+/** The fur band: deep orange through the coat colour to the white tail tip, left to right. It edges the header
+    and the track deck where the sibling plugins have hazard stripes. */
+inline void furBand (juce::Graphics& g, juce::Rectangle<float> r)
 {
-    juce::Graphics::ScopedSaveState save (g);
-    g.reduceClipRegion (r.getSmallestIntegerContainer());
-    g.setColour (c::plate);
+    juce::ColourGradient grad (c::furDeep, r.getX(), 0.0f, c::furTip, r.getRight(), 0.0f, false);
+    grad.addColour (0.45, c::fur);
+    grad.addColour (0.78, c::furGold);
+    g.setGradientFill (grad);
     g.fillRect (r);
-    g.setColour (c::accent);
-    const float h = r.getHeight();
-    for (float x = r.getX() - h; x < r.getRight(); x += band * 2.0f)
-    {
-        juce::Path p;
-        p.addQuadrilateral (x, r.getBottom(), x + band, r.getBottom(), x + band + h, r.getY(), x + h, r.getY());
-        g.fillPath (p);
-    }
+    g.setColour (c::furLine.withAlpha (0.35f));
+    g.fillRect (r.withTop (r.getBottom() - 1.0f));
 }
 
 /** One fox tail along an arc around (cx, cy): thin at the root, full in the middle, a white tip with a jagged edge.
@@ -592,11 +594,13 @@ inline float liveValue (TailsProcessor& p, int s, int param)
 
 // ---------------------------------------------------------------- the two chains
 
-/** Two rows of six plates, one row per stream. Click a plate to edit it, click its LED to switch it, drag it to reorder. */
+/** Routing view: a dark grid with one wire per stream, the six blocks threaded on it in signal order. Left of the
+    grid each stream has its name and a compact strip of the order (one letter per effect, dim when off). Click a block
+    to edit it, its power dot to switch it, drag it along the wire to reorder. A switched-off block is hatched. */
 class ChainView : public juce::Component
 {
 public:
-    static constexpr int kRowH = 60, kRowGap = 8, kLabelW = 98, kBlockW = 110, kPitch = 121;
+    static constexpr int kRowH = 64, kRowGap = 0, kLabelW = 100, kBlockW = 96, kBlockH = 40, kPitch = 112, kPad = 30;
     std::function<void (int, int)> onSelect;
 
     explicit ChainView (TailsProcessor& p) : proc (p) {}
@@ -604,41 +608,59 @@ public:
     void setSelected (int stream, int fx) { selStream = stream; selFx = fx; repaint(); }
     void tick() { repaint(); }
 
+    static constexpr const char* kLetter[kNumFx] = { "C", "T", "D", "H", "R", "F" };
+
     void paint (juce::Graphics& g) override
     {
+        const auto canvas = juce::Rectangle<float> ((float) kLabelW - 4.0f, 0.0f, (float) getWidth() - kLabelW + 4.0f, (float) getHeight());
+        {
+            juce::Path body;
+            body.addRoundedRectangle (canvas, 6.0f);
+            g.setColour (c::display);
+            g.fillPath (body);
+            juce::Graphics::ScopedSaveState save (g);
+            g.reduceClipRegion (body);
+            g.setColour (c::onPlate.withAlpha (0.045f));
+            for (float x = canvas.getX() + 8.0f; x < canvas.getRight(); x += 16.0f) g.fillRect (x, canvas.getY(), 1.0f, canvas.getHeight());
+            for (float y = 8.0f; y < canvas.getBottom(); y += 16.0f) g.fillRect (canvas.getX(), y, canvas.getWidth(), 1.0f);
+            g.setColour (c::plate);
+            g.drawRoundedRectangle (canvas.reduced (0.5f), 6.0f, 1.0f);
+        }
+
         for (int s = 0; s < kStreams; ++s)
         {
-            const int y = rowY (s);
-            auto tag = juce::Rectangle<float> (0.0f, (float) y + 12.0f, (float) kLabelW - 10.0f, 36.0f);
-            g.setColour (c::ink);
-            g.setFont (black (13.5f, 0.02f));
-            g.drawText (s == 0 ? "TRANSIENT" : "TONAL", tag.withTrimmedBottom (14), juce::Justification::left);
-            g.setFont (pixel (10.0f));
-            g.setColour (c::inkSoft);
-            g.drawText (proc.sf (s, sOn) > 0.5f ? "ACTIVE" : "BYPASS", tag.withTrimmedTop (20), juce::Justification::left);
-
+            const bool streamOn = proc.sf (s, sOn) > 0.5f;
+            const float cy = (float) rowY (s) + kRowH * 0.5f;
             int order[kNumFx];
             proc.getOrder (s, order);
-            // while dragging, the plates make room for the dragged one
+
+            // name and order strip
+            g.setColour (streamOn ? c::ink : c::inkSoft);
+            g.setFont (black (13.5f, 0.02f));
+            g.drawText (s == 0 ? "TRANSIENT" : "TONAL", 0, (int) cy - 22, kLabelW - 10, 16, juce::Justification::left);
+            drawStrip (g, s, order, { 0.0f, cy + 2.0f, (float) kLabelW - 12.0f, 18.0f }, streamOn);
+
+            // wire, end to end, with its terminals
+            g.setColour (c::wire.withAlpha (streamOn ? 1.0f : 0.4f));
+            g.fillRect (canvas.getX(), cy - 1.0f, canvas.getWidth(), 2.0f);
+            g.setFont (pixel (10.0f));
+            g.setColour (c::onPlate.withAlpha (0.55f));
+            g.drawText ("IN", (int) canvas.getX() + 6, (int) cy - 15, 30, 12, juce::Justification::left);
+            g.drawText ("OUT", (int) canvas.getRight() - 36, (int) cy - 15, 30, 12, juce::Justification::right);
+
             if (dragging && dragStream == s) applyDrag (order);
             for (int i = 0; i < kNumFx; ++i)
             {
-                if (i > 0)
+                if (dragging && dragStream == s && order[i] == dragFx)
                 {
-                    g.setColour (c::inkSoft);
-                    const float ax = (float) slotX (i) - 6.0f, ay = (float) y + kRowH * 0.5f;
-                    juce::Path head;
-                    head.addTriangle (ax - 3, ay - 4, ax - 3, ay + 4, ax + 3, ay);
-                    g.fillPath (head);
+                    g.setColour (c::onPlate.withAlpha (0.25f));   // the free slot
+                    g.drawRoundedRectangle (blockRect (s, i).reduced (1.0f), 5.0f, 1.0f);
+                    continue;
                 }
-                if (dragging && dragStream == s && order[i] == dragFx) continue;
-                drawBlock (g, s, order[i], juce::Rectangle<float> ((float) slotX (i), (float) y, (float) kBlockW, (float) kRowH));
+                drawBlock (g, s, order[i], blockRect (s, i));
             }
             if (dragging && dragStream == s)
-            {
-                auto r = juce::Rectangle<float> ((float) dragX - kBlockW * 0.5f, (float) y - 2.0f, (float) kBlockW, (float) kRowH);
-                drawBlock (g, s, dragFx, r);
-            }
+                drawBlock (g, s, dragFx, blockRect (s, 0).withX ((float) dragX - kBlockW * 0.5f).translated (0.0f, -3.0f));
         }
     }
 
@@ -666,7 +688,7 @@ public:
         if (pressed < 0 || e.getDistanceFromDragStart() < 6) return;
         dragging = true; moved = true; dragStream = pressStream; dragFx = pressed;
         dragX = juce::jlimit (slotX (0) + kBlockW / 2, slotX (kNumFx - 1) + kBlockW / 2, e.x);
-        dragSlot = juce::jlimit (0, kNumFx - 1, (dragX - slotX (0)) / kPitch);
+        dragSlot = juce::jlimit (0, kNumFx - 1, (dragX - slotX (0) + (kPitch - kBlockW) / 2) / kPitch);
         repaint();
     }
 
@@ -692,7 +714,11 @@ private:
     struct Hit { int stream = 0, fx = -1; bool led = false; };
 
     static int rowY (int s) { return s * (kRowH + kRowGap); }
-    static int slotX (int i) { return kLabelW + i * kPitch; }
+    static int slotX (int i) { return kLabelW + kPad + i * kPitch; }
+    static juce::Rectangle<float> blockRect (int s, int i)
+    {
+        return { (float) slotX (i), (float) rowY (s) + (kRowH - kBlockH) * 0.5f, (float) kBlockW, (float) kBlockH };
+    }
 
     Hit locate (juce::Point<int> p) const
     {
@@ -703,10 +729,10 @@ private:
             int order[kNumFx];
             proc.getOrder (s, order);
             for (int i = 0; i < kNumFx; ++i)
-                if (p.x >= slotX (i) && p.x < slotX (i) + kBlockW)
+                if (blockRect (s, i).expanded (4.0f, 8.0f).contains (p.toFloat()))
                 {
                     h.stream = s; h.fx = order[i];
-                    h.led = p.x < slotX (i) + 36 && p.y < rowY (s) + 30;
+                    h.led = p.x < slotX (i) + 26;
                 }
         }
         return h;
@@ -719,37 +745,75 @@ private:
         for (int i = 0, k = 0; i < kNumFx; ++i) order[i] = i == dragSlot ? dragFx : rest[k++];
     }
 
+    /** One letter per effect in signal order, threaded on a line: the compact view of the chain. */
+    void drawStrip (juce::Graphics& g, int s, const int* order, juce::Rectangle<float> r, bool streamOn) const
+    {
+        const float cell = 12.0f, gap = (r.getWidth() - kNumFx * cell) / (float) (kNumFx - 1);
+        const float cy = r.getCentreY();
+        g.setColour (c::ink.withAlpha (streamOn ? 0.45f : 0.2f));
+        g.fillRect (r.getX(), cy - 0.5f, r.getWidth(), 1.0f);
+        g.setFont (pixel (10.0f));
+        for (int i = 0; i < kNumFx; ++i)
+        {
+            const int fx = order[i];
+            const bool on = proc.sf (s, onParam (fx)) > 0.5f && streamOn;
+            const bool sel = s == selStream && fx == selFx;
+            auto b = juce::Rectangle<float> (r.getX() + (float) i * (cell + gap), cy - cell * 0.5f - 1.0f, cell, cell + 2.0f);
+            g.setColour (sel ? c::fur : (on ? c::node : juce::Colour (0xffc9ced8)));
+            g.fillRoundedRectangle (b, 2.0f);
+            g.setColour (sel ? c::ink : (on ? c::onPlate : c::ink.withAlpha (0.4f)));
+            g.drawText (kLetter[fx], b.translated (0.5f, 0.0f), juce::Justification::centred);
+        }
+    }
+
     void drawBlock (juce::Graphics& g, int s, int fx, juce::Rectangle<float> r) const
     {
         const bool on = proc.sf (s, onParam (fx)) > 0.5f;
         const bool live = liveValue (proc, s, onParam (fx)) > 0.5f;
         const bool sel = s == selStream && fx == selFx;
-        auto p = platePath (r.withTrimmedRight (3).withTrimmedBottom (3));
-        g.setColour (juce::Colour (0x40000000));
-        g.fillPath (p, juce::AffineTransform::translation (3, 3));
-        g.setColour (sel ? c::accent : (on ? c::plate : juce::Colour (0xffb9bfca)));
-        g.fillPath (p);
-        const auto ink = sel ? c::onAccent : (on ? c::onPlate : c::ink);
+        juce::Path body;
+        body.addRoundedRectangle (r, 5.0f);
 
-        auto led = juce::Rectangle<float> (9, 9).withCentre ({ r.getX() + 30, r.getY() + 16 });
-        g.setColour (live ? c::go : (sel || on ? ink.withAlpha (0.3f) : c::ink.withAlpha (0.25f)));
+        g.setColour (juce::Colour (0x59000000));
+        g.fillPath (body, juce::AffineTransform::translation (0.0f, 3.0f));
+        if (sel)         g.setGradientFill (juce::ColourGradient (c::furGold, 0, r.getY(), c::fur, 0, r.getBottom(), false));
+        else if (on)     g.setGradientFill (juce::ColourGradient (c::nodeHi, 0, r.getY(), c::node, 0, r.getBottom(), false));
+        else             g.setColour (juce::Colour (0xff15315c));
+        g.fillPath (body);
+        if (! on)
+        {
+            // bypassed: hatched, as on a routing diagram
+            juce::Graphics::ScopedSaveState save (g);
+            g.reduceClipRegion (body);
+            g.setColour (c::onPlate.withAlpha (0.09f));
+            for (float x = r.getX() - r.getHeight(); x < r.getRight(); x += 7.0f)
+                g.drawLine (x, r.getBottom(), x + r.getHeight(), r.getY(), 2.0f);
+        }
+        g.setColour (sel ? c::furTip : c::onPlate.withAlpha (on ? 0.22f : 0.14f));
+        g.strokePath (body, juce::PathStrokeType (sel ? 2.0f : 1.0f));
+
+        const auto ink = sel ? c::onAccent : (on ? c::onPlate : c::onPlate.withAlpha (0.45f));
+        // power dot: green while the effect is live
+        auto led = juce::Rectangle<float> (9, 9).withCentre ({ r.getX() + 14.0f, r.getCentreY() - 4.0f });
+        g.setColour (live ? c::go : ink.withAlpha (0.35f));
         g.fillEllipse (led);
-        if (sel) { g.setColour (c::onAccent); g.drawEllipse (led, 1.2f); }
+        g.setColour (sel ? c::onAccent : juce::Colours::black.withAlpha (0.4f));
+        g.drawEllipse (led, 1.0f);
 
         g.setColour (ink);
-        g.setFont (black (12.5f, 0.02f));
-        g.drawText (kFxShort[fx], (int) r.getX() + 39, (int) r.getY() + 7, (int) r.getWidth() - 44, 18, juce::Justification::left);
+        g.setFont (bold (12.0f, 0.06f));
+        g.drawText (kFxShort[fx], (int) r.getX() + 24, (int) r.getY() + 5, (int) r.getWidth() - 28, 16, juce::Justification::left);
         g.setFont (pixel (10.0f));
         g.setColour (ink.withAlpha (0.8f));
-        g.drawText (juce::String (juce::roundToInt (proc.sf (s, mixParam (fx)))) + " %", (int) r.getX() + 14, (int) r.getY() + 28, 60, 12, juce::Justification::left);
+        g.drawText (juce::String (juce::roundToInt (proc.sf (s, mixParam (fx)))) + " %", (int) r.getX() + 24, (int) r.getY() + 21, (int) r.getWidth() - 30, 12, juce::Justification::left);
 
-        // level of this effect's wet output
+        // level of this effect's wet output, along the bottom edge
         const float lvl = proc.engine->ui.fxLevel[(size_t) s][(size_t) fx].load (std::memory_order_relaxed);
         const float db = juce::jlimit (0.0f, 1.0f, 1.0f + 20.0f * std::log10 (lvl + 1.0e-5f) / 48.0f);
-        auto bar = juce::Rectangle<float> (r.getX() + 8, r.getY() + 44, r.getWidth() - 34, 4);
-        g.setColour (sel ? c::onAccent.withAlpha (0.2f) : c::onPlate.withAlpha (on ? 0.16f : 0.5f));
+        auto bar = juce::Rectangle<float> (r.getX() + 6.0f, r.getBottom() - 6.0f, r.getWidth() - 12.0f, 3.0f);
+        g.setColour (sel ? c::onAccent.withAlpha (0.18f) : c::onPlate.withAlpha (0.12f));
         g.fillRect (bar);
-        g.setColour (sel ? c::onAccent : (on ? c::accent : c::ink));
+        g.setColour (sel ? c::onAccent : c::accent);
         g.fillRect (bar.withWidth (bar.getWidth() * db));
     }
 

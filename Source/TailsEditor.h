@@ -152,10 +152,7 @@ public:
 
         g.setColour (c::groundAlt);
         g.fillRect (0.0f, 0.0f, W, (float) kHeaderH);
-        hazard (g, { 0.0f, (float) kHeaderH - 6.0f, W, 6.0f });
-        // the logo's two tails, behind the last letters
-        foxTail (g, 150.0f, -46.0f, 84.0f, 3.14f, 2.16f, 26.0f);
-        foxTail (g, 158.0f, -90.0f, 128.0f, 3.14f, 2.42f, 23.0f);
+        furBand (g, { 0.0f, (float) kHeaderH - 6.0f, W, 6.0f });
         g.setFont (black (34.0f, -0.01f));
         const juce::String name ("MULTITAILS");
         g.setColour (c::go);      g.drawText (name, 22, 15, 340, 40, juce::Justification::centredLeft);
@@ -211,7 +208,7 @@ public:
             g.fillPath (body);
             juce::Graphics::ScopedSaveState save (g);
             g.reduceClipRegion (body);
-            hazard (g, deck.withHeight (8.0f));
+            furBand (g, deck.withHeight (8.0f));
         }
 
         if (midiBtn.getToggleState())
@@ -222,7 +219,7 @@ public:
         glassPanel (g, { 408, 88, 856, 186 }, "Signal flow", "Chains");
         g.setColour (c::inkSoft);
         g.setFont (medium (11.5f));
-        g.drawText ("Click a plate to edit it, its LED to switch it. Drag to change the order.", 560, 110, 660, 16, juce::Justification::right);
+        g.drawText ("Click a block to edit it, its dot to switch it. Drag it along the wire to reorder.", 560, 110, 660, 16, juce::Justification::right);
         glassPanel (g, { 408, 286, 856, 290 }, juce::String (kStreamNames[stream]) + " chain", kFxNames[fx]);
     }
 
@@ -255,7 +252,7 @@ public:
         inMeter.setBounds (302, 668, 74, 8);
         outMeter.setBounds (302, 704, 74, 8);
 
-        chains.setBounds (424, 136, 824, 2 * ChainView::kRowH + ChainView::kRowGap);
+        chains.setBounds (424, 140, 824, 2 * ChainView::kRowH + ChainView::kRowGap);
         well.setBounds (424, 338, 304, 226);
         midi.setBounds (424, 96, 824, 470);
         lanesView.setBounds (424, 612, 172, kLanes * LaneList::kRowH);
