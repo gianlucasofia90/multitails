@@ -14,3 +14,5 @@ Prima versione.
 - MIDI map a 64 slot: CC, note, pitch bend e pressure, con MIDI learn e modi Absolute, Toggle, Momentary, Relative.
 - 15 preset di fabbrica e preset utente.
 - Formati: VST3 (macOS, Windows, Linux), AU, AAX (non firmato). VST2 solo con SDK Steinberg proprio.
+- Grafica: fondo arancione volpe con fascia azzurra e scacchiera chiara, due code dalla punta bianca dietro i pannelli, tag del preset blu. Al posto delle strisce gialle e nere, una banda sfumata dall'arancione al bianco della punta della coda.
+- Catene come schema di routing: griglia scura con un filo per flusso e i blocchi infilati in ordine, blocchi spenti tratteggiati, e accanto al nome del flusso una striscia compatta con l'ordine (C T D H R F). Clic, punto di accensione e trascinamento funzionano come prima.
