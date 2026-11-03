@@ -128,11 +128,18 @@ Verificato su macOS, Windows e Linux in CI: 312 test automatici (DSP misurato, s
 
 ## Download
 Ogni tag `v*` pubblica una Release con:
-- macOS: VST3, AU e AAX non firmato (universal arm64 + x86_64);
+- macOS: installer `.pkg` con VST3 e AU, oppure VST3, AU e AAX non firmato in zip (universal arm64 + x86_64, da macOS 11);
 - Windows: VST3;
 - Linux: VST3.
 
-**macOS**: le build CI non sono notarizzate. Dopo aver copiato i plugin in `~/Library/Audio/Plug-Ins/VST3` e `~/Library/Audio/Plug-Ins/Components`, togli la quarantena:
+**macOS**: le build non sono firmate con un Developer ID né notarizzate, quindi macOS le blocca come file scaricati da internet. Il modo più semplice è l'installer:
+1. Scarica `Multitails-…-macOS-Installer.pkg` e aprilo. macOS lo blocca.
+2. Vai in Impostazioni di Sistema → Privacy e sicurezza, premi `Apri comunque` e completa l'installazione.
+3. In Live fai una nuova scansione dei plugin: in Impostazioni → Plug-in tieni premuto Option e premi `Scansiona`.
+
+L'approvazione serve una volta sola per il pacchetto: i plugin installati non hanno la quarantena. Vanno in `/Library/Audio/Plug-Ins/VST3` e `/Library/Audio/Plug-Ins/Components`. Se avevi copiato a mano una versione precedente in `~/Library/Audio/Plug-Ins`, cancellala.
+
+Se preferisci gli zip, dopo aver copiato i plugin togli la quarantena dal Terminale, perché `Apri comunque` può non bastare per un VST3:
 ```bash
 xattr -dr com.apple.quarantine ~/Library/Audio/Plug-Ins/VST3/"MULTITAILS.vst3" ~/Library/Audio/Plug-Ins/Components/"MULTITAILS.component"
 ```

@@ -72,6 +72,15 @@ jobs:
           for b in build/Multitails_artefacts/$BUILD_TYPE/VST3/*.vst3 build/Multitails_artefacts/$BUILD_TYPE/AU/*.component \
                    ~/Library/Audio/Plug-Ins/VST3/"MULTITAILS.vst3" ~/Library/Audio/Plug-Ins/Components/"MULTITAILS.component"; do
             codesign --force --deep --sign - "$b"
+            codesign --verify --deep --strict --verbose=2 "$b"
+          done
+      - name: Check minimum macOS version
+        run: |
+          # the plugins must not depend on the macOS of the build machine
+          for b in build/Multitails_artefacts/$BUILD_TYPE/VST3/*.vst3 build/Multitails_artefacts/$BUILD_TYPE/AU/*.component; do
+            vtool -show-build "$b/Contents/MacOS/MULTITAILS" | tee vtool.txt
+            grep -q "minos 11.0" vtool.txt
+            if grep "minos" vtool.txt | grep -qv "minos 11.0"; then exit 1; fi
           done
       - name: auval
         run: |
@@ -93,10 +102,27 @@ jobs:
           if [ -d "$A/AAX/MULTITAILS.aaxplugin" ]; then
             ditto -c -k --keepParent "$A/AAX/MULTITAILS.aaxplugin" "dist/Multitails-$TAG-macOS-AAX-unsigned.zip"
           fi
+          # installer: one approval for the package, and what it installs carries no quarantine
+          mkdir -p pkgroot/Library/Audio/Plug-Ins/VST3 pkgroot/Library/Audio/Plug-Ins/Components
+          ditto "$A/VST3/MULTITAILS.vst3" "pkgroot/Library/Audio/Plug-Ins/VST3/MULTITAILS.vst3"
+          ditto "$A/AU/MULTITAILS.component" "pkgroot/Library/Audio/Plug-Ins/Components/MULTITAILS.component"
+          VERSION=$(sed -n 's/^project(Multitails VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)
+          pkgbuild --root pkgroot --component-plist scripts/pkg-components.plist --identifier com.gianlucasofia.multitails.pkg \
+            --version "$VERSION" --install-location / "dist/Multitails-$TAG-macOS-Installer.pkg"
+      - name: Test the installer
+        run: |
+          sudo installer -pkg dist/*.pkg -target /
+          for b in /Library/Audio/Plug-Ins/VST3/"MULTITAILS.vst3" /Library/Audio/Plug-Ins/Components/"MULTITAILS.component"; do
+            test -f "$b/Contents/MacOS/MULTITAILS"
+            codesign --verify --deep --strict --verbose=2 "$b"
+            if xattr -r "$b" | grep -q com.apple.quarantine; then exit 1; fi
+          done
       - uses: actions/upload-artifact@v4
         with:
           name: Multitails-macOS
-          path: dist/*.zip
+          path: |
+            dist/*.zip
+            dist/*.pkg
 
   windows:
     name: Windows (VST3, pluginval)
@@ -153,7 +179,7 @@ jobs:
           [ -s notes.md ] || echo "MULTITAILS $GITHUB_REF_NAME" > notes.md
           if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
             # release already created from the GitHub web page: just attach the builds
-            gh release upload "$GITHUB_REF_NAME" dist/*.zip --clobber
+            gh release upload "$GITHUB_REF_NAME" dist/* --clobber
           else
-            gh release create "$GITHUB_REF_NAME" dist/*.zip --title "MULTITAILS $GITHUB_REF_NAME" --notes-file notes.md --verify-tag
+            gh release create "$GITHUB_REF_NAME" dist/* --title "MULTITAILS $GITHUB_REF_NAME" --notes-file notes.md --verify-tag
           fi

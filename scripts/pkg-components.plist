@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Per l'installer macOS: i plugin vanno sempre in queste cartelle, anche se ne esiste una copia altrove. -->
+<plist version="1.0">
+<array>
+    <dict>
+        <key>BundleHasStrictIdentifier</key><false/>
+        <key>BundleIsRelocatable</key><false/>
+        <key>BundleIsVersionChecked</key><false/>
+        <key>BundleOverwriteAction</key><string>upgrade</string>
+        <key>RootRelativeBundlePath</key><string>Library/Audio/Plug-Ins/VST3/MULTITAILS.vst3</string>
+    </dict>
+    <dict>
+        <key>BundleHasStrictIdentifier</key><false/>
+        <key>BundleIsRelocatable</key><false/>
+        <key>BundleIsVersionChecked</key><false/>
+        <key>BundleOverwriteAction</key><string>upgrade</string>
+        <key>RootRelativeBundlePath</key><string>Library/Audio/Plug-Ins/Components/MULTITAILS.component</string>
+    </dict>
+</array>
+</plist>

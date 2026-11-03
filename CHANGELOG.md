@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.1.1] - 2026-11-03
+- macOS: nuovo installer `.pkg` con VST3 e AU. Basta approvare il pacchetto una volta, e i plugin installati non restano bloccati da Gatekeeper.
+- macOS: corretta la versione minima del sistema: le build ora partono da macOS 11, come previsto.
+- La CI verifica firma ad hoc, versione minima e installer a ogni build.
+
 ## [0.1.0] - 2026-11-03
 Prima versione.
 - Split transiente/tonale in tempo e frequenza, con Focus, Smoothing, Trans Decay e Source. La somma dei due flussi è esattamente l'ingresso.
