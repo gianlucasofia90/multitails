@@ -1,0 +1,18 @@
+# MULTITAILS – note per lo sviluppo
+
+- JUCE 8 audio effect with MIDI input (VST3/AU/AAX, optional VST2). Third of the family after SONIC GRAIN and DR. SEGG-UENCER: same look and toolchain, violet ground.
+- `Source/TailsCore.h`, `TailsConv.h`, `TailsFx.h`, `TailsSplit.h`, `TailsEngine.h` hold no JUCE and must stay real-time safe: no allocation, no locks after `prepare()`. Control runs on a grid of `kTick` (32) samples counted from `prepare()` and the sequencer reads musical time, so output does not depend on buffer size (tested).
+- Build + tests: `cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DMULTITAILS_BUILD_TESTS=ON -DMULTITAILS_COPY_AFTER_BUILD=OFF && cmake --build build --target MultitailsTests -j2`, then run `build/Tests/MultitailsTests_artefacts/Release/MultitailsTests`. `--snap file.png page stream fx preset scale` renders the editor (page 0 effects, 1 MIDI map); look at it after any UI change. `--render file.wav preset seconds` plays a test phrase through a preset.
+- JUCE: `-DJUCE_DIR=<path>` for a local copy; otherwise FetchContent downloads tag 8.0.10.
+- Headless Linux without the X dev packages: export `CXXFLAGS="-DJUCE_USE_XRANDR=0 -DJUCE_USE_XINERAMA=0 -DJUCE_USE_XCURSOR=0 -DJUCE_USE_XRENDER=0 -DJUCE_ALSA=0 -DJUCE_JACK=0"` before configuring.
+- Never change these, or hosts lose saved sessions: plugin code `Mtls`, manufacturer code `Gsof`, parameter IDs (the `id` fields in `streamParams()`, `kLaneIds`, the `g_*` ids), or the order of any list (`kIrNames`, `kDivisions`, the destination list). Append only. A new stream parameter goes at the end of enum `P` and of `streamParams()`; both follow the same order. A new sequencer destination falls at the end of `DestTable` only if the new parameter is at the end of the table.
+- `sOrder` is one integer: the rank of a permutation of the six effects (`orderFromRank`, `rankFromOrder`).
+- On/off parameters are 2-item choices (`bparam` in `Params.h`), so pluginval strictness 8 passes the state-restore test.
+- Decay and Damp act per partition inside the convolver at run time, so lanes can reach them. Size, Reverse and the IR choice rebuild the response on the worker thread and are not sequencer destinations.
+- Decay is a gain per 1024-sample partition, so on very short tails the envelope has steps of 21 ms. Accepted: a smooth version would cost a second convolution.
+- The audio thread never touches an IR build. `TailsProcessor::Worker` polls the parameters, builds, posts; the convolver swaps at a partition boundary with a crossfade and parks the old response for the worker to delete.
+- MIDI map: the audio thread writes the mapped value straight into the parameter's raw atomic, so the engine hears it at once; the host parameter follows on the message thread (`flushMidiMap`).
+- Step data and the MIDI map are not host parameters: they are child nodes of the state. The MIDI map is saved with the session but not in presets, because it belongs to the machine.
+- Factory IRs: `tools/make_irs.py`, see `Resources/ir/README.md`. The 8 rooms are CC BY-SA 4.0: keep the attribution.
+- Release: update `CHANGELOG.md` and `project(... VERSION x.y.z)` in `CMakeLists.txt`, then push tag `vx.y.z`. CI builds and publishes the Release.
+- The user is Italian: user-facing docs (README, CHANGELOG, scripts) are in Italian. The interface is in English, like the sibling plugins.

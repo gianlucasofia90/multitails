@@ -1,0 +1,25 @@
+# build output
+build/
+build-*/
+cmake-build-*/
+out/
+dist/
+JUCE/
+
+# IDEs / OS
+.vs/
+.vscode/
+.idea/
+*.xcodeproj/
+*.xcworkspace/
+xcuserdata/
+.DS_Store
+Thumbs.db
+
+# logs and markers from scripts/
+build_log.txt
+auval_log.txt
+BUILD_OK
+BUILD_FAILED
+snap_*.png
+editor-*.png
