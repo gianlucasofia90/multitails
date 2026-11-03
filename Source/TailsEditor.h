@@ -12,6 +12,11 @@ public:
         : proc (p), chains (p), wave (p), well (p), lanesView (p), steps (p), midi (p),
           inMeter (p.engine->ui.inPeak), outMeter (p.engine->ui.outPeak)
     {
+        backdrop.draw = [this] (juce::Graphics& g) { paintBackdrop (g); };
+        backdrop.setInterceptsMouseClicks (false, false);
+        backdrop.setOpaque (true);
+        backdrop.setBufferedToImage (true);
+        addAndMakeVisible (backdrop);
         setLookAndFeel (&lnf);
         using K = tails::Control::Kind;
         using namespace tails;
@@ -131,7 +136,7 @@ public:
         selectFx (stream, tails::fxConv);
     }
 
-    void paint (juce::Graphics& g) override
+    void paintBackdrop (juce::Graphics& g)
     {
         using namespace tails;
         const float W = (float) getWidth(), H = (float) getHeight();
@@ -225,6 +230,7 @@ public:
 
     void resized() override
     {
+        backdrop.setBounds (getLocalBounds());
         using namespace tails;
         auto at = [this] (const char* id, int x, int y, int w, int h) { if (auto* c = globalById[id]) c->setBounds (x, y, w, h); };
         prevBtn.setBounds (288, 20, 36, 30);
@@ -435,13 +441,13 @@ private:
         if (auto* c = globalById["g_mix"]) c->setModulation (proc.engine->ui.gnorm[gdMix].load (std::memory_order_relaxed));
 
         const bool free = proc.state.getRawParameterValue ("g_sync")->load() > 0.5f;
-        if (free != freeShown) { freeShown = free; repaint (0, 0, getWidth(), kHeaderH); }
+        if (free != freeShown) { freeShown = free; backdrop.repaint (0, 0, getWidth(), kHeaderH); }
         if (auto* c = globalById["g_bpm"]) c->setVisible (free);
         if (auto* c = globalById["g_run"]) c->setVisible (free);
         if (++slowTick >= 5)
         {
             slowTick = 0;
-            if (const auto bpm = proc.uiBpm.load(); bpm != bpmShown) { bpmShown = bpm; repaint ((int) kConsoleX, 8, 1280 - (int) kConsoleX, 54); }
+            if (const auto bpm = proc.uiBpm.load(); bpm != bpmShown) { bpmShown = bpm; backdrop.repaint ((int) kConsoleX, 8, 1280 - (int) kConsoleX, 54); }
             if (presetBox.getSelectedItemIndex() != proc.presets.getCurrent()) refreshPresets();
         }
     }
@@ -467,6 +473,14 @@ private:
     }
 
     struct Placed { Place place; tails::Control* control; };
+
+    /** A child that draws through its owner: the static artwork, cached so animated controls never redraw it. */
+    struct Layer : juce::Component
+    {
+        std::function<void (juce::Graphics&)> draw;
+        void paint (juce::Graphics& g) override { draw (g); }
+    };
+    Layer backdrop;
 
     TailsProcessor& proc;
     tails::LookAndFeel lnf;

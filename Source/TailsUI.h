@@ -418,6 +418,7 @@ public:
     Control (juce::AudioProcessorValueTreeState& s, const juce::String& id, const juce::String& label, Kind k)
         : kind (k), paramId (id)
     {
+        setBufferedToImage (true);   // the window often repaints around a control that has not changed
         caption.setText (label.toUpperCase(), juce::dontSendNotification);
         caption.setJustificationType (k == Kind::Knob ? juce::Justification::centred : juce::Justification::centredLeft);
         caption.setFont (bold (11.0f, 0.06f));

@@ -1,5 +1,8 @@
 # Changelog
 
+## [0.1.2] - 2026-11-03
+- Interfaccia molto più fluida: lo sfondo e i controlli fermi vengono conservati in immagine invece di essere ridisegnati a ogni fotogramma. Nelle misure il tempo di disegno scende da 100-180 ms a meno di 10 ms per fotogramma.
+
 ## [0.1.1] - 2026-11-03
 - macOS: nuovo installer `.pkg` con VST3 e AU. Basta approvare il pacchetto una volta, e i plugin installati non restano bloccati da Gatekeeper.
 - macOS: corretta la versione minima del sistema: le build ora partono da macOS 11, come previsto.
