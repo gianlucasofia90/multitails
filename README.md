@@ -124,7 +124,7 @@ Il plugin è un effetto audio che accetta MIDI. Per fargli arrivare il MIDI: su 
 `Init`, `Amber Halls`, `Incunabula Plate`, `Ambient Works Tape`, `Echorec Swell`, `Echorec Heads`, `EMT Plate`, `Gated Snare`, `Reverse Ghosts`, `Leslie Ramp`, `Rotary Keys`, `Filter Steps`, `Ping Pong Tails`, `Cathedral Wash`, `LoFi Dub Hits`. Sono punti di partenza ispirati a quei dischi, non ricostruzioni. I preset utente stanno in `~/Music/Multitails Presets/*.mtails`.
 
 ## Stato
-Verificato: test automatici (DSP misurato, sequencer, MIDI map, stato, interfaccia) e pluginval livello 8 su Linux. Da verificare: build macOS e Windows in CI, auval, e soprattutto l'ascolto e l'uso reale in Ableton Live, compreso il MIDI verso un effetto.
+Verificato su macOS, Windows e Linux in CI: 312 test automatici (DSP misurato, sequencer, MIDI map, stato, interfaccia) e pluginval livello 8, più auval su macOS. Da verificare: l'ascolto e l'uso reale in Ableton Live, compreso il MIDI verso un effetto.
 
 ## Download
 Ogni tag `v*` pubblica una Release con:
