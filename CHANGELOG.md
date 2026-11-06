@@ -1,5 +1,8 @@
 # Changelog
 
+## [0.1.3] - 2026-11-06
+- macOS: il plugin ora funziona anche sui Mac Intel con macOS 10.13 High Sierra o successivo, compreso Catalina. Prima richiedeva macOS 11: in Ableton Live il VST3 non compariva e l'AU compariva ma non si apriva. Sui Mac Apple Silicon non cambia nulla.
+
 ## [0.1.2] - 2026-11-03
 - Interfaccia molto più fluida: lo sfondo e i controlli fermi vengono conservati in immagine invece di essere ridisegnati a ogni fotogramma. Nelle misure il tempo di disegno scende da 100-180 ms a meno di 10 ms per fotogramma.
 - Convoluzione senza picchi di CPU: la coda dell'IR viene calcolata a piccole dosi invece che tutta insieme ogni 1024 campioni. Con due IR da 9,4 s e buffer da 128 campioni il blocco tipico più lento (99° percentile) scende di circa cinque volte; il carico medio cresce di circa il 10 %.
