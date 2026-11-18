@@ -38,6 +38,7 @@ public:
         {
             auto add = [&] (int param, const char* label, K kind) {
                 auto* ctl = strip.add (new Control (p.state, TailsProcessor::sid (s, param), label, kind));
+                if (kind == K::Toggle) ctl->getProperties().set ("sgBare", true);   // word and LED, no plate
                 wire (*ctl);
                 addAndMakeVisible (ctl);
             };
@@ -369,6 +370,7 @@ private:
         for (auto& e : tables[fx])
         {
             auto* ctl = fxControls.add (new Control (proc.state, TailsProcessor::sid (stream, e.param), e.label, e.kind));
+            if (fx == fxTape && e.param >= tH1 && e.param <= tH4) ctl->getProperties().set ("sgBare", true);   // the four heads: number and LED
             wire (*ctl);
             addAndMakeVisible (ctl);
             ctl->sendLookAndFeelChange();
@@ -391,8 +393,8 @@ private:
             if (e.place.row < 0)
             {
                 const auto kind = e.place.kind;
-                const bool head = fx == tails::fxTape && e.place.col >= 3;    // the four heads are small plates
-                const int w = head ? 58 : (kind == tails::Control::Kind::Menu ? 112 : (juce::String (e.place.label).length() > 5 ? 130 : 98));
+                const bool head = fx == tails::fxTape && e.place.col >= 3;    // the four heads: LED and number, no plate
+                const int w = head ? 46 : (kind == tails::Control::Kind::Menu ? 112 : (juce::String (e.place.label).length() > 5 ? 130 : 98));
                 e.control->setBounds (titleX, kind == tails::Control::Kind::Menu ? headerY + 6 : headerY + 2, w, kind == tails::Control::Kind::Menu ? 24 : 30);
                 titleX += w + 6;
             }

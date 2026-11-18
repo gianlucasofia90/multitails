@@ -6,6 +6,7 @@
 - Ogni sezione ha il proprio titolo: SPLIT, MIXER (i due flussi), OUTPUT (con la latenza a destra), CHAINS, MIDI MAP. Ogni effetto mostra il proprio nome (CONVOLUTION, TAPE ECHO, DELAY, CHORUS, ROTARY, FILTER) con sopra la catena in cui si trova.
 - Nuovo logo nell'header: un disco arancione con un anello che sfuma dall'azzurro al bianco. Dentro, un coltellino multiuso aperto a ventaglio: un manico scuro con il rivetto e cinque lame che sono code di volpe con la punta bianca, una con la punta gialla. Accanto, la scritta MULTITAILS in Rubik Black Italic, senza più l'ombra rossa/verde.
 - I file del logo (icona, versioni mono, orizzontale, verticale, solo scritta; SVG e PNG) sono in `Resources/logo`, con lo script che li genera.
+- ON, SOLO e TAILS dei due flussi e le quattro testine del tape echo (1-4) senza targa né ombra: solo la scritta e un pallino più grande, come nella lista tracce di DR. SEGG-UENCER.
 - Nessun cambiamento ai parametri né al suono: preset e sessioni salvate restano compatibili.
 
 ## [0.1.3] - 2026-11-06

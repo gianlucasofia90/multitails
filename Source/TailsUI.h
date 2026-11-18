@@ -196,6 +196,15 @@ inline void glassPanel (juce::Graphics& g, juce::Rectangle<float> r, const juce:
     sectionTitle (g, r.reduced (16.0f, 0.0f).withY (r.getY() + 12.0f), kicker, title, mode);
 }
 
+/** Toggles drawn without a plate: only the word and a large LED, as the track list of DR. SEGG-UENCER.
+    The control (or the button itself) carries the property. */
+inline bool isBare (const juce::Component& comp)
+{
+    for (auto* p = &comp; p != nullptr; p = p->getParentComponent())
+        if (p->getProperties()["sgBare"]) return true;
+    return false;
+}
+
 /** Controls on a dark ground (header plates, modulation deck) carry this property. */
 inline bool isOnDark (const juce::Component& comp)
 {
@@ -208,6 +217,7 @@ class LookAndFeel : public juce::LookAndFeel_V4
 {
 public:
     static constexpr int kValueH = 13, kCaptionH = 15;   // knob readout and caption rows
+    static constexpr float kBareLed = 12.0f;             // LED of a toggle without plate
 
     LookAndFeel()
     {
@@ -346,6 +356,14 @@ public:
         auto r = b.getLocalBounds().toFloat().reduced (1.0f, 2.0f).withTrimmedRight (3.0f).withTrimmedBottom (1.0f);
         const bool on = b.getToggleState();
         const bool rec = b.getProperties()["sgRec"];
+        if (isBare (b))
+        {   // no plate, no shadow: a large LED with a ring when on, the word beside it (drawButtonText)
+            auto led = juce::Rectangle<float> (kBareLed, kBareLed).withCentre ({ r.getX() + 4.0f + kBareLed * 0.5f, r.getCentreY() });
+            g.setColour (on ? c::go : (over || down ? c::ink.withAlpha (0.35f) : c::ink.withAlpha (0.2f)));
+            g.fillEllipse (led);
+            if (on) { g.setColour (c::ink); g.drawEllipse (led.expanded (1.0f), 1.5f); }
+            return;
+        }
         auto p = platePath (r);
         g.setColour (juce::Colour (0x59000000));
         g.fillPath (p, juce::AffineTransform::translation (3, 3));
@@ -370,6 +388,14 @@ public:
     {
         auto r = b.getLocalBounds().toFloat().reduced (1.0f, 2.0f).withTrimmedRight (3.0f).withTrimmedBottom (1.0f);
         const bool on = b.getToggleState(), rec = b.getProperties()["sgRec"];
+        if (isBare (b))
+        {
+            r.removeFromLeft (4.0f + kBareLed + 8.0f);
+            g.setFont (black (13.0f, 0.04f));
+            g.setColour (on ? c::ink : (b.isOver() ? c::tag : c::inkSoft));
+            g.drawText (b.getButtonText().toUpperCase(), r, juce::Justification::centredLeft, false);
+            return;
+        }
         if (b.getClickingTogglesState()) r.removeFromLeft (r.getHeight() * 0.58f + 12.0f);
         g.setFont (getTextButtonFont (b, b.getHeight()));
         g.setColour (on && ! rec ? c::onAccent : c::onPlate);
