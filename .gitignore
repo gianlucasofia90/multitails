@@ -27,5 +27,9 @@ auval_release_log.txt
 pluginval_release_log.txt
 PACKAGE_OK
 PACKAGE_FAILED
+publish_log.txt
+notes.md
+PUBLISH_OK
+PUBLISH_FAILED
 snap_*.png
 editor-*.png
