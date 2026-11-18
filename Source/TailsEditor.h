@@ -104,6 +104,7 @@ public:
         chains.setSelected (s, f);
         well.setFx (s, f);
         buildFxControls();
+        backdrop.repaint();   // titles are drawn in the cached backdrop: a plain repaint() keeps the old image
         repaint();
     }
 
@@ -113,6 +114,7 @@ public:
         lanesView.setSelected (l);
         steps.setLane (l);
         buildLaneControls();
+        backdrop.repaint();   // titles are drawn in the cached backdrop: a plain repaint() keeps the old image
         repaint();
     }
 
@@ -124,6 +126,7 @@ public:
         chains.setVisible (! on); well.setVisible (! on);
         for (auto* c : fxControls) c->setVisible (! on);
         loadBtn.setVisible (! on && fx == tails::fxConv);
+        backdrop.repaint();   // titles are drawn in the cached backdrop: a plain repaint() keeps the old image
         repaint();
     }
 

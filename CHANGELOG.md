@@ -7,6 +7,7 @@
 - Nuovo logo nell'header: un disco arancione con un anello che sfuma dall'azzurro al bianco. Dentro, un coltellino multiuso aperto a ventaglio: un manico scuro con il rivetto e cinque lame che sono code di volpe con la punta bianca, una con la punta gialla. Accanto, la scritta MULTITAILS in Rubik Black Italic, senza più l'ombra rossa/verde.
 - I file del logo (icona, versioni mono, orizzontale, verticale, solo scritta; SVG e PNG) sono in `Resources/logo`, con lo script che li genera.
 - ON, SOLO e TAILS dei due flussi e le quattro testine del tape echo (1-4) senza targa né ombra: solo la scritta e un pallino più grande, come nella lista tracce di DR. SEGG-UENCER.
+- Corretto: il titolo del pannello dell'effetto ora cambia quando si sceglie un altro effetto o l'altro flusso (CONVOLUTION, TAPE ECHO, DELAY, CHORUS, ROTARY, FILTER, con TRANSIENT CHAIN o TONAL CHAIN sopra). Prima restava quello del primo effetto aperto.
 - Nessun cambiamento ai parametri né al suono: preset e sessioni salvate restano compatibili.
 
 ## [0.1.3] - 2026-11-06

@@ -1191,6 +1191,29 @@ static void testInterface()
     for (int l = 0; l < kLanes; ++l) te->selectLane (l);
     te->showMidi (true); te->tickForSnapshot(); te->showMidi (false);
     te->setSize (768, 480); te->setSize (2560, 1600);
+
+    // the panel titles live in the cached backdrop: a new effect or stream must redraw them, not keep the old ones
+    {
+        te->setSize (1280, 800);
+        auto title = [&] { return te->createComponentSnapshot ({ 408, 290, 200, 50 }, true, 1.0f); };
+        auto same = [] (const juce::Image& a, const juce::Image& b)
+        {
+            for (int y = 0; y < a.getHeight(); ++y)
+                for (int x = 0; x < a.getWidth(); ++x)
+                    if (a.getPixelAt (x, y) != b.getPixelAt (x, y)) return false;
+            return true;
+        };
+        te->selectFx (0, fxConv); te->tickForSnapshot();
+        const auto conv = title();
+        te->selectFx (0, fxDelay); te->tickForSnapshot();
+        const auto delay = title();
+        te->selectFx (1, fxDelay); te->tickForSnapshot();
+        const auto tonalDelay = title();
+        te->selectFx (0, fxConv); te->tickForSnapshot();
+        CHECK (! same (conv, delay), "choosing another effect redraws the panel title");
+        CHECK (! same (delay, tonalDelay), "choosing the other stream redraws the chain name above the title");
+        CHECK (same (conv, title()), "coming back to an effect shows its title again");
+    }
     ++passes;
 }
 
