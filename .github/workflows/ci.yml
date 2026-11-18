@@ -56,11 +56,11 @@ jobs:
         run: |
           mkdir -p dist
           cd "build/Multitails_artefacts/$BUILD_TYPE/VST3" && zip -qr "$GITHUB_WORKSPACE/dist/Multitails-${GITHUB_REF_NAME//\//-}-Linux-VST3.zip" "MULTITAILS.vst3"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: Multitails-Linux
           path: dist/*.zip
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: editor-screenshot
           path: editor-linux.png
@@ -133,7 +133,7 @@ jobs:
             codesign --verify --deep --strict --verbose=2 "$b"
             if xattr -r "$b" | grep -q com.apple.quarantine; then exit 1; fi
           done
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: Multitails-macOS
           path: |
@@ -168,7 +168,7 @@ jobs:
           TAG="${GITHUB_REF_NAME//\//-}"
           cd "build/Multitails_artefacts/$BUILD_TYPE/VST3"
           7z a -tzip "$GITHUB_WORKSPACE/dist/Multitails-$TAG-Windows-VST3.zip" "MULTITAILS.vst3" > /dev/null
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: Multitails-Windows
           path: dist/*.zip
