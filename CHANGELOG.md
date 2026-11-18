@@ -8,6 +8,7 @@
 - I file del logo (icona, versioni mono, orizzontale, verticale, solo scritta; SVG e PNG) sono in `Resources/logo`, con lo script che li genera.
 - ON, SOLO e TAILS dei due flussi e le quattro testine del tape echo (1-4) senza targa né ombra: solo la scritta e un pallino più grande, come nella lista tracce di DR. SEGG-UENCER.
 - Corretto: il titolo del pannello dell'effetto ora cambia quando si sceglie un altro effetto o l'altro flusso (CONVOLUTION, TAPE ECHO, DELAY, CHORUS, ROTARY, FILTER, con TRANSIENT CHAIN o TONAL CHAIN sopra). Prima restava quello del primo effetto aperto.
+- Nuovo script `scripts/package-mac.command`: prepara su un Mac i pacchetti macOS della Release (universale, firmati ad hoc, verificati con auval e pluginval, con installer `.pkg`). La CI pubblica la Release con Windows e Linux senza aspettare le macchine macOS di GitHub.
 - Nessun cambiamento ai parametri né al suono: preset e sessioni salvate restano compatibili.
 
 ## [0.1.3] - 2026-11-06

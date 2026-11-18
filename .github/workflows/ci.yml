@@ -175,7 +175,10 @@ jobs:
 
   release:
     name: GitHub Release
-    if: startsWith(github.ref, 'refs/tags/v')
+    # GitHub's macOS runners are often cancelled in the queue: the release does not wait for them.
+    # The macOS packages are built on a Mac with scripts/package-mac.command and attached to the release;
+    # if the macOS job does finish, its builds are attached too (--clobber).
+    if: always() && startsWith(github.ref, 'refs/tags/v') && needs.linux.result == 'success' && needs.windows.result == 'success'
     needs: [linux, macos, windows]
     runs-on: ubuntu-24.04
     permissions:

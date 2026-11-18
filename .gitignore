@@ -4,6 +4,7 @@ build-*/
 cmake-build-*/
 out/
 dist/
+dist-mac/
 JUCE/
 
 # IDEs / OS
@@ -21,5 +22,10 @@ build_log.txt
 auval_log.txt
 BUILD_OK
 BUILD_FAILED
+package_log.txt
+auval_release_log.txt
+pluginval_release_log.txt
+PACKAGE_OK
+PACKAGE_FAILED
 snap_*.png
 editor-*.png

@@ -161,7 +161,7 @@ cmake --build build --config Release
 - **Mac senza Terminale**: doppio clic su `scripts/build-mac.command`, poi `scripts/verify-au.command` per auval.
 
 ### Pubblicare una versione
-Doppio clic su `scripts/release.bat` (Windows) o `scripts/release.command` (macOS): aggiorna la versione in `CMakeLists.txt`, aggiunge la voce nel CHANGELOG se manca, fa push e crea il tag `vX.Y.Z`. La CI pubblica la Release.
+Doppio clic su `scripts/release.bat` (Windows) o `scripts/release.command` (macOS): aggiorna la versione in `CMakeLists.txt`, aggiunge la voce nel CHANGELOG se manca, fa push e crea il tag `vX.Y.Z`. La CI pubblica la Release con le build Windows e Linux. Le macchine macOS di GitHub vengono spesso annullate in coda, quindi la Release non le aspetta: i pacchetti macOS si preparano su un Mac con un doppio clic su `scripts/package-mac.command` (build universale, test, firma ad hoc, auval, pluginval, zip e installer in `dist-mac/`) e si allegano alla Release.
 
 ### Test
 ```bash
