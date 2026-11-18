@@ -1,6 +1,8 @@
 # MULTITAILS
 
-Multieffetto a **due catene** in formato **VST3 / AU / AAX** (C++ / JUCE 8): separa il segnale in transiente e tonale e lavora su ciascuno con riverbero a convoluzione, tape echo, delay, chorus, rotary e filtri, in qualsiasi ordine. È il terzo della famiglia dopo [SONIC GRAIN](https://github.com/gianlucasofia90/SONICGRAIN) e [DR. SEGG-UENCER](https://github.com/gianlucasofia90/dr.segg-uencer): stessa grafica e stessa toolchain, qui su fondo arancione e azzurro con due code.
+<img src="Resources/logo/multitails-icon@2x.png" width="96" alt="Logo MULTITAILS">
+
+Multieffetto a **due catene** in formato **VST3 / AU / AAX** (C++ / JUCE 8): separa il segnale in transiente e tonale e lavora su ciascuno con riverbero a convoluzione, tape echo, delay, chorus, rotary e filtri, in qualsiasi ordine. È il terzo della famiglia dopo [SONIC GRAIN](https://github.com/gianlucasofia90/SONICGRAIN) e [DR. SEGG-UENCER](https://github.com/gianlucasofia90/dr.segg-uencer): stessa grafica e stessa toolchain, qui su fondo arancione e azzurro con due code. Ogni plugin della famiglia prende una caratteristica del suo personaggio: la velocità per SONIC GRAIN, l'uovo per DR. SEGG-UENCER, le code per MULTITAILS. Il logo è un coltellino multiuso aperto a ventaglio, con code di volpe al posto delle lame (`Resources/logo`).
 
 Il suono di riferimento resta quello di *Incunabula* e *Amber* degli Autechre e di *Selected Ambient Works 85-92* di Aphex Twin: colpi secchi lanciati in code digitali lunghe e granulose, nastro e chorus sulla parte tenuta, mandate che si aprono a tempo invece di un mix fisso. Su quei dischi il riverbero era quasi sempre un Alesis Quadraverb: da lì la famiglia `Digital` delle risposte all'impulso e l'idea della catena di effetti in serie.
 

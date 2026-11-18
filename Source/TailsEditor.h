@@ -158,11 +158,16 @@ public:
         g.setColour (c::groundAlt);
         g.fillRect (0.0f, 0.0f, W, (float) kHeaderH);
         furBand (g, { 0.0f, (float) kHeaderH - 6.0f, W, 6.0f });
-        g.setFont (black (34.0f, -0.01f));
-        const juce::String name ("MULTITAILS");
-        g.setColour (c::go);      g.drawText (name, 22, 15, 340, 40, juce::Justification::centredLeft);
-        g.setColour (c::signal);  g.drawText (name, 19, 12, 340, 40, juce::Justification::centredLeft);
-        g.setColour (c::onPlate); g.drawText (name, 16, 9, 340, 40, juce::Justification::centredLeft);
+        // logo: multi-tool mark (five tails fanned out of a handle) + live wordmark (Rubik Black Italic),
+        // no offset shadow, as in SONIC GRAIN and DR. SEGG-UENCER
+        constexpr int markSize = 46;
+        const juce::Rectangle<float> markBox ((float) kMargin, (kHeaderH - 6 - markSize) * 0.5f, (float) markSize, (float) markSize);
+        if (logoMark != nullptr)
+            logoMark->drawWithin (g, markBox, juce::RectanglePlacement::centred, 1.0f);
+        g.setFont (black (30.0f, -0.01f));
+        const int wmX = kMargin + markSize + 12;
+        g.setColour (c::onPlate);
+        g.drawText ("MULTITAILS", juce::Rectangle<int> (wmX, 0, 282 - wmX, kHeaderH - 6), juce::Justification::centredLeft);
         taggedPlate (g, { 330, 17, 300, 34 }, c::tag);
 
         const bool freeRun = proc.state.getRawParameterValue ("g_sync")->load() > 0.5f;
@@ -185,23 +190,19 @@ public:
         }
 
         // left column
+        // left column: three sections, each with its own two-line title
         glassPanel (g, { 16, 88, 376, 696 }, "Transient and tonal", "Split");
-        g.setColour (c::ink.withAlpha (0.14f));
-        g.fillRect (32, 454, 344, 1);
-        g.fillRect (32, 620, 344, 1);
-        g.setColour (c::inkSoft);
-        g.setFont (medium (10.0f, 0.3f));
-        g.drawText ("STREAMS", 34, 460, 120, 12, juce::Justification::left);
-        g.drawText ("OUTPUT", 34, 626, 120, 12, juce::Justification::left);
+        sectionTitle (g, { 32.0f, (float) kStreamsY, 344.0f, 37.0f }, "Two streams", "Mixer");
+        sectionTitle (g, { 32.0f, (float) kOutputY, 344.0f, 37.0f }, "Master", "Output",
+                      "Latency " + juce::String (proc.getLatencySamples()) + " smp");
         g.setColour (c::ink);
         g.setFont (black (13.0f, 0.02f));
-        g.drawText ("TRANSIENT", 32, 482, 110, 16, juce::Justification::left);
-        g.drawText ("TONAL", 32, 552, 110, 16, juce::Justification::left);
+        g.drawText ("TRANSIENT", 32, kStreamsY + 44, 110, 16, juce::Justification::left);
+        g.drawText ("TONAL", 32, kStreamsY + 106, 110, 16, juce::Justification::left);
         g.setFont (pixel (10.0f));
         g.setColour (c::inkSoft);
-        g.drawText ("LATENCY " + juce::String (proc.getLatencySamples()) + " SAMPLES", 174, 626, 202, 12, juce::Justification::right);
-        g.drawText ("IN", 302, 654, 74, 12, juce::Justification::left);
-        g.drawText ("OUT", 302, 690, 74, 12, juce::Justification::left);
+        g.drawText ("IN", 302, kOutputY + 48, 74, 12, juce::Justification::left);
+        g.drawText ("OUT", 302, kOutputY + 84, 74, 12, juce::Justification::left);
 
         // deck: the sequencer
         const auto deck = juce::Rectangle<float> (408.0f, (float) kDeckY, W - 408.0f - kMargin, H - kDeckY - kMargin);
@@ -224,7 +225,8 @@ public:
         glassPanel (g, { 408, 88, 856, 186 }, "Signal flow", "Chains");
         g.setColour (c::inkSoft);
         g.setFont (medium (11.5f));
-        g.drawText ("Click a block to edit it, its dot to switch it. Drag it along the wire to reorder.", 560, 110, 660, 16, juce::Justification::right);
+        g.drawText ("Click a block to edit it, its dot to switch it. Drag it along the wire to reorder.", 560, 116, 688, 16, juce::Justification::right);
+        // every effect has its own section name; the kicker says which chain it sits in
         glassPanel (g, { 408, 286, 856, 290 }, juce::String (kStreamNames[stream]) + " chain", kFxNames[fx]);
     }
 
@@ -250,13 +252,13 @@ public:
 
         for (int s = 0; s < kStreams; ++s)
         {
-            const int y = s == 0 ? 502 : 572;
+            const int y = kStreamsY + (s == 0 ? 62 : 124);
             for (int i = 0; i < 3; ++i) strip[s * 4 + i]->setBounds (28 + i * 80, y, 80, 30);
             strip[s * 4 + 3]->setBounds (276, y - 16, 100, 40);
         }
-        at ("g_in", 32, 644, 86, 106); at ("g_mix", 118, 644, 86, 106); at ("g_out", 204, 644, 86, 106);
-        inMeter.setBounds (302, 668, 74, 8);
-        outMeter.setBounds (302, 704, 74, 8);
+        at ("g_in", 32, kOutputY + 44, 86, 106); at ("g_mix", 118, kOutputY + 44, 86, 106); at ("g_out", 204, kOutputY + 44, 86, 106);
+        inMeter.setBounds (302, kOutputY + 62, 74, 8);
+        outMeter.setBounds (302, kOutputY + 98, 74, 8);
 
         chains.setBounds (424, 140, 824, 2 * ChainView::kRowH + ChainView::kRowGap);
         well.setBounds (424, 338, 304, 226);
@@ -272,6 +274,7 @@ public:
 
 private:
     static constexpr int kDeckY = 592, kHeaderH = 72, kMargin = 16;
+    static constexpr int kStreamsY = 450, kOutputY = 616;   // tops of the MIXER and OUTPUT titles in the SPLIT panel
     static constexpr float kConsoleX = 1000.0f, kRunX = 1180.0f;
 
     static bool isAudio (const juce::String& path)
@@ -484,6 +487,7 @@ private:
 
     TailsProcessor& proc;
     tails::LookAndFeel lnf;
+    std::unique_ptr<juce::Drawable> logoMark { juce::Drawable::createFromImageData (TailsFonts::multitailsmark_svg, TailsFonts::multitailsmark_svgSize) };
     tails::ChainView chains;
     tails::SplitWave wave;
     tails::FxWell well;

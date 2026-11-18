@@ -85,7 +85,7 @@ inline juce::Path platePath (juce::Rectangle<float> r)
     return p;
 }
 
-/** Plate with the stacked hard shadow (signal, then go) used by section tags and the preset tag. */
+/** Plate with the stacked hard shadow (signal, then go) used by the preset tag. */
 inline void taggedPlate (juce::Graphics& g, juce::Rectangle<float> r, juce::Colour fill)
 {
     g.setColour (c::go);     g.fillPath (platePath (r.translated (7, 7)));
@@ -158,8 +158,33 @@ inline void foxTail (juce::Graphics& g, float cx, float cy, float rad, float a0,
     g.strokePath (body, juce::PathStrokeType (3.0f * k, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
 }
 
-/** Glass panel with its two-line title: kicker word, then the section word on a tagged plate. */
-inline void glassPanel (juce::Graphics& g, juce::Rectangle<float> r, const juce::String& kicker, const juce::String& title)
+/** Two-line section title set as plain type, as in SONIC GRAIN and DR. SEGG-UENCER: a light, widely tracked kicker
+    over the section word, both flush left, an optional mode word flush right on the second line, then a hairline.
+    No plate and no shadow behind the words. The top of the block is at y; the hairline sits at y + 36. */
+inline void sectionTitle (juce::Graphics& g, juce::Rectangle<float> text, const juce::String& kicker, const juce::String& title,
+                          const juce::String& mode = {})
+{
+    const float y = text.getY();
+    g.setColour (c::inkSoft);
+    g.setFont (medium (12.0f, 0.42f));
+    g.drawText (kicker.toUpperCase(), text.withY (y).withHeight (14), juce::Justification::centredLeft, false);
+    const auto line2 = text.withY (y + 16).withHeight (16);
+    g.setColour (c::ink);
+    g.setFont (bold (14.0f, 0.36f));
+    g.drawText (title.toUpperCase(), line2, juce::Justification::centredLeft, false);
+    if (mode.isNotEmpty())
+    {
+        g.setColour (c::inkSoft);
+        g.setFont (medium (12.0f, 0.12f));
+        g.drawText (mode.toUpperCase(), line2, juce::Justification::centredRight, false);
+    }
+    g.setColour (c::inkSoft.withAlpha (0.45f));
+    g.fillRect (text.getX(), y + 36.0f, text.getWidth(), 1.0f);
+}
+
+/** Glass panel with its two-line title (sectionTitle). Content starts 56 px below the top of the panel. */
+inline void glassPanel (juce::Graphics& g, juce::Rectangle<float> r, const juce::String& kicker, const juce::String& title,
+                        const juce::String& mode = {})
 {
     juce::Path body;
     body.addRoundedRectangle (r, 10.0f);
@@ -168,17 +193,7 @@ inline void glassPanel (juce::Graphics& g, juce::Rectangle<float> r, const juce:
     g.fillPath (body);
     g.setColour (c::glassEdge);
     g.strokePath (body, juce::PathStrokeType (1.0f));
-
-    g.setColour (c::inkSoft);
-    g.setFont (medium (10.0f, 0.3f));
-    g.drawText (kicker.toUpperCase(), (int) r.getX() + 16, (int) r.getY() + 8, 200, 12, juce::Justification::left);
-    const auto f = bold (13.0f, 0.22f);
-    const float tw = juce::GlyphArrangement::getStringWidth (f, title.toUpperCase()) + 36.0f;
-    auto tr = juce::Rectangle<float> (r.getX() + 18, r.getY() + 22, tw, 22);
-    taggedPlate (g, tr, c::plate);
-    g.setColour (c::onPlate);
-    g.setFont (f);
-    g.drawText (title.toUpperCase(), tr.reduced (14, 0), juce::Justification::centred);
+    sectionTitle (g, r.reduced (16.0f, 0.0f).withY (r.getY() + 12.0f), kicker, title, mode);
 }
 
 /** Controls on a dark ground (header plates, modulation deck) carry this property. */

@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.0] - 2026-11-18
+- Restyling dell'interfaccia, allineata a SONIC GRAIN e DR. SEGG-UENCER.
+- Titoli delle sezioni solo testo, senza targa né ombra: parola chiave chiara e spaziata sopra il nome della sezione in grassetto, entrambe allineate a sinistra, poi una linea sottile. A destra, dove serve, il modo della sezione.
+- Ogni sezione ha il proprio titolo: SPLIT, MIXER (i due flussi), OUTPUT (con la latenza a destra), CHAINS, MIDI MAP. Ogni effetto mostra il proprio nome (CONVOLUTION, TAPE ECHO, DELAY, CHORUS, ROTARY, FILTER) con sopra la catena in cui si trova.
+- Nuovo logo nell'header: un disco arancione con un anello che sfuma dall'azzurro al bianco. Dentro, un coltellino multiuso aperto a ventaglio: un manico scuro con il rivetto e cinque lame che sono code di volpe con la punta bianca, una con la punta gialla. Accanto, la scritta MULTITAILS in Rubik Black Italic, senza più l'ombra rossa/verde.
+- I file del logo (icona, versioni mono, orizzontale, verticale, solo scritta; SVG e PNG) sono in `Resources/logo`, con lo script che li genera.
+- Nessun cambiamento ai parametri né al suono: preset e sessioni salvate restano compatibili.
+
 ## [0.1.3] - 2026-11-06
 - macOS: il plugin ora funziona anche sui Mac Intel con macOS 10.13 High Sierra o successivo, compreso Catalina. Prima richiedeva macOS 11: in Ableton Live il VST3 non compariva e l'AU compariva ma non si apriva. Sui Mac Apple Silicon non cambia nulla.
 
